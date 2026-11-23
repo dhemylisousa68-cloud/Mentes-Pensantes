@@ -93,9 +93,10 @@ html.pausado *, html.pausado *::before, html.pausado *::after { animation-play-s
 @keyframes deriva { from { transform: translateX(-70px); } to { transform: translateX(90px); } }
 
 /* mascote no cenário, proporcional e com sombra de contato */
-.mascote { left: 1157px; top: 295px; width: 400px; height: 600px; }
+.mascote { left: 1160px; top: 294px; width: 413px; height: 620px; }
 .rig { width: 100%; height: 100%; display: block; overflow: visible; }
-#hub.retrato .mascote { left: 1072px; }
+.rig-nota { font: 700 46px Georgia, serif; fill: #f1e4c8; stroke: #2a1712; stroke-width: 3px; paint-order: stroke; }
+#hub.retrato .mascote { left: 1030px; }
 
 .neve { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
@@ -229,20 +230,41 @@ html.pausado *, html.pausado *::before, html.pausado *::after { animation-play-s
 
 /* convite voando do envelope até virar o painel */
 .convite-voo {
-  position: fixed; z-index: 70; transform-origin: 0 0; pointer-events: none;
-  background: linear-gradient(160deg, #f3e6c9, #dcc79e); border: 3px solid #9c8358; border-radius: 10px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, .55); display: grid; place-items: center;
+  position: fixed; z-index: 70; transform-origin: 50% 50%; pointer-events: none; perspective: 700px;
+  background: linear-gradient(160deg, #e6d3ac, #cdb487); border: 2px solid #8a7048; border-radius: 6px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .55);
 }
-.convite-voo::before {
-  content: ""; position: absolute; inset: 0;
-  background: linear-gradient(155deg, transparent 49.4%, #a88d60 50%, transparent 50.6%), linear-gradient(25deg, transparent 49.4%, #a88d60 50%, transparent 50.6%);
-  background-size: 100% 60%; background-repeat: no-repeat;
+.convite-voo > span { position: absolute; }
+/* a carta dentro do envelope */
+.cv-carta {
+  left: 7%; right: 7%; top: 8%; bottom: 10%; border-radius: 3px;
+  background: repeating-linear-gradient(180deg, transparent 0 14px, rgba(110, 27, 38, .12) 14px 15px), linear-gradient(170deg, #f8eed8, #ead9b6);
+  transition: transform .5s cubic-bezier(.3, .8, .3, 1) .25s;
 }
-.convite-voo .cv-selo {
-  position: relative; width: 20%; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center;
-  background: radial-gradient(circle at 35% 35%, #c8343f, #7d0f19 70%); border: 3px solid #4a0610;
-  font-family: var(--fonte-placa); font-weight: 700; color: #f1c9b0; font-size: clamp(1.2rem, 4vw, 2.6rem);
+/* frente do envelope (bolso em V) */
+.cv-frente {
+  inset: 0; border-radius: 6px;
+  background: linear-gradient(170deg, #efe0bf, #d6bf94);
+  clip-path: polygon(0 34%, 50% 70%, 100% 34%, 100% 100%, 0 100%);
 }
+/* aba de cima: vira para trás ao abrir */
+.cv-aba {
+  left: 0; right: 0; top: 0; height: 68%; transform-origin: 50% 0;
+  background: linear-gradient(180deg, #e2cda3, #c9ad7e);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  transition: transform .4s cubic-bezier(.5, 0, .3, 1);
+}
+.cv-selo {
+  left: 50%; top: 58%; width: 20%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 35%, #c8343f, #7d0f19 70%); border: 2px solid #4a0610;
+  font-family: var(--fonte-placa); font-weight: 700; color: #f1c9b0; font-size: clamp(1rem, 3vw, 2rem);
+  transition: transform .3s ease, opacity .3s ease;
+}
+.convite-voo.abrindo .cv-selo { transform: translateY(30px) scale(.6); opacity: 0; }
+.convite-voo .cv-carta { z-index: 1; } .convite-voo .cv-frente { z-index: 2; } .convite-voo .cv-aba { z-index: 3; } .convite-voo .cv-selo { z-index: 4; }
+/* aberta, a aba fica atrás da carta, que sobe para fora do envelope */
+.convite-voo.abrindo .cv-aba { transform: rotateX(178deg); z-index: 0; }
+.convite-voo.abrindo .cv-carta { transform: translateY(-55%); }
 
 /* ================= PAINEL DA SALA ================= */
 .painel-fundo {
@@ -262,7 +284,9 @@ html.pausado *, html.pausado *::before, html.pausado *::after { animation-play-s
 }
 .painel-sala[hidden] { display: none; }
 .painel-sala.medindo { display: flex; visibility: hidden; }
-.painel-sala.surgindo > * { animation: conteudo .35s ease both; }
+.painel-sala.surgindo { animation: sairDaCarta .45s cubic-bezier(.2, .9, .3, 1.1) both; }
+.painel-sala.surgindo > * { animation: conteudo .35s .15s ease both; }
+@keyframes sairDaCarta { from { scale: .55; opacity: 0; } to { scale: 1; opacity: 1; } }
 .painel-sala.suave { animation: surgir .35s ease both; }
 @keyframes conteudo { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .ps-selo {

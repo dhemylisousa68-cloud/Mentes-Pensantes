@@ -40,6 +40,7 @@ MP.ReacaoBotao = (() => {
       if (reduzido()) {
         mascote.expressao({ sobrancelha: true, sorriso: 4 });
         mascote.pose('disfarcar');
+        mascote.variante?.('dedo');
         estado = 'aguardando';
         return;
       }
@@ -57,7 +58,8 @@ MP.ReacaoBotao = (() => {
       // 5. dobra o cotovelo e leva a mão para trás do corpo
       agendar(560, () => { estado = 'esconder'; mascote.pose('esconder'); });
       // 6. fingindo inocência, espera o clique
-      agendar(1200, () => { estado = 'aguardando'; mascote.pose('disfarcar'); });
+      // 6. fingindo inocência: dedo erguido, assobiando, enquanto espera o clique
+      agendar(1200, () => { estado = 'aguardando'; mascote.pose('disfarcar'); mascote.variante?.('dedo'); mascote.assobiar?.(true); });
     }
 
     // mantém a reação um instante e só então volta, devagar
@@ -70,6 +72,8 @@ MP.ReacaoBotao = (() => {
       if (estado === 'abrir') return;
       estado = 'voltando';
       mascote.expressao({ sobrancelha: false });
+      mascote.variante?.(null);
+      mascote.assobiar?.(false);
       [3, 2, 1, 0].forEach((n, i) => agendar(i * 150, () => mascote.expressao({ sorriso: n })));
       agendar(200, () => mascote.pose(poseEspera()));
       agendar(900, () => { estado = 'espera'; });

@@ -298,6 +298,34 @@ MP.Som = (() => {
     env(g2, t, .16, .12, 1); o.connect(bp); bp.connect(g2); g2.connect(efeitos); o.start(t); o.stop(t + 1.3);
   }
 
+  // assobio disfarçado: melodia curta em loop enquanto ele finge que não fez nada
+  const ASSOBIO = [79, 83, 81, 79, null, 76, 79, null, 81, 79, 76, 74, null, null];
+  let assobioTimer = 0;
+  function notaAssobio(m, t, dur) {
+    const o = ctx.createOscillator(), g = ctx.createGain(), vib = ctx.createOscillator(), vg = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(hz(m) * .985, t);
+    o.frequency.exponentialRampToValueAtTime(hz(m), t + .05); // desliza até a nota, como um assobio
+    vib.frequency.value = 5.5; vg.gain.value = hz(m) * .012; vib.connect(vg); vg.connect(o.frequency);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(.07, t + .04);
+    g.gain.setValueAtTime(.07, t + dur * .7);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(efeitos); g.connect(reverb);
+    o.start(t); vib.start(t); o.stop(t + dur + .05); vib.stop(t + dur + .05);
+  }
+  function assobio(ligar = true) {
+    clearInterval(assobioTimer); assobioTimer = 0;
+    if (!ligar || !ctx) return;
+    let i = 0;
+    const tocar = () => {
+      const m = ASSOBIO[i++ % ASSOBIO.length];
+      if (m) notaAssobio(m, ctx.currentTime + .02, .2);
+    };
+    tocar();
+    assobioTimer = setInterval(tocar, 210);
+  }
+
   // aba oculta: suspende o áudio; ao voltar, retoma
   document.addEventListener('visibilitychange', () => {
     if (!ctx) return;
@@ -305,7 +333,7 @@ MP.Som = (() => {
   });
 
   return {
-    iniciar, tocarMusica, pararMusica, drone, tique, zumbidoLuz, brilho, impacto, puf, sinos, shh, clique, ambiente, atravessar,
+    iniciar, tocarMusica, pararMusica, drone, tique, zumbidoLuz, brilho, impacto, puf, sinos, shh, clique, ambiente, atravessar, assobio,
     alternarMudo, get mudo() { return mudo; }, get ativo() { return !!ctx; },
   };
 })();

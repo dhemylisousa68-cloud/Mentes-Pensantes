@@ -96,3 +96,45 @@ parte visual muda.
 - Hoje, sem as camadas, aparecem só a olhadela (cabeça), o braço recolhendo e o corpo
   se inclinando. Sobrancelha e sorriso ficam registrados em `data-sobrancelha` e
   `data-sorriso` no SVG do mascote, prontos para as camadas novas.
+
+## Arte da faca (`assets/mascote/faca.png`) — mascote principal
+
+Recortada da arte enviada (fundo preto removido; as gotas soltas no ar foram retiradas, as
+da lâmina ficaram). Peças: cabeça + gorro, pompom e o **braço com a faca**, que gira no
+cotovelo (203, 442).
+
+- **Esconder a faca:** o braço passa para a camada de trás logo no início do gesto e gira
+  ~150°; a cabeça e o tronco cobrem a faca de verdade (sem transparência). Na volta, ele só
+  retorna para a frente quando já está quase no lugar.
+- **Escolha do caso:** ergue a faca, esconde atrás das costas, fala "Álibi não incluso" e o
+  convite sai de trás dele até virar o painel; depois a faca volta devagar para a mão.
+- **"Criar sala":** a reação esconde a faca de novo e ela fica escondida até a sala abrir.
+- A arte do envelope (`natal.webp`) continua disponível no rig (`arte: 'envelope'`).
+
+Ainda dependem das camadas listadas acima: pupilas, piscar, sobrancelha e as etapas do
+sorriso. O pacote "Mascote_M_Referencia_Tecnica" traz pivôs e ordem de camadas, mas não traz
+as peças desenhadas.
+
+### Olhos, vergonha e cartinha (feito com a própria arte)
+
+- **Olhos:** as pupilas foram recortadas da arte (`faca-pupilas.png`) e o lugar delas foi
+  preenchido com a textura do olho (`faca-olhos.png`). Elas seguem o cursor até a borda do
+  olho; a cabeça acompanha menos e mais devagar; ao sair da janela, voltam ao centro.
+- **Piscar:** a pálpebra de cima da arte desce até fechar, em intervalos variados.
+- **Sangue:** as gotas da arte ficam e novas gotas (`gota.png`) pingam da lâmina.
+- **Vergonha (passar na placa do caso):** olha para baixo e para o lado, pálpebras pesadas,
+  bochechas coradas, esconde a faca e assobia (notas ♪ e som). A boca não faz "bico": isso
+  precisa de uma boca desenhada.
+- **Clique na placa:** lá atrás ele troca a faca pela cartinha (a mão da arte do envelope,
+  encaixada na mesma mão), puxa a cartinha para a frente, ela voa, a aba abre e o painel sai
+  de dentro dela. Depois a faca volta para a mão.
+
+### Poses de assobio (`assobio.png`, `assobio-dedo.png`)
+
+Desenhadas alinhadas com a arte da faca (mesmo corpo, botas e cabeça no mesmo lugar). Por isso
+entram como **variantes**: com a faca já escondida atrás do corpo, o rig cruza rapidamente
+para a pose desenhada; a cabeça dela continua girando junto com a do rig.
+
+- Passar pela placa do caso → mãos para trás, lábios em bico, assobiando (notas e som).
+- Perto do "Criar sala", esperando o clique → dedo erguido, assobiando.
+- Novas poses no mesmo enquadramento podem ser adicionadas em `variantes` (js/mascote-rig.js).

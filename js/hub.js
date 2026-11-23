@@ -107,6 +107,7 @@
         ${luzes}<span class="sr">${esc(c.titulo)}, ${esc(c.tema)}, ${esc(c.jogadores)}</span>
       </button>`).join('');
     mascote = MP.Rig.criar($('#mascote'), { reduzido });
+    MP.mascote = mascote; // acesso pelo console, para testar poses
     neve = MP.Neve.iniciar($('#neve'), { reduzido });
     // reação ao "Criar sala": só vale com o painel aberto na aba de criar
     reacao = MP.ReacaoBotao.ligar({
@@ -114,7 +115,7 @@
       mascote,
       reduzido,
       ativo: () => !painel.hidden && !$('#ps-criar').hidden && !ocupado,
-      poseEspera: () => 'segurar',
+      poseEspera: () => 'repouso',
     });
     enquadrar();
     window.addEventListener('resize', enquadrar);
@@ -202,10 +203,31 @@
       b.setAttribute('aria-pressed', sel);
     });
   }
+  // Passar pela placa do caso: ele fica sem graça, esconde a faca atrás das costas e assobia,
+  // como quem não fez nada. Ao sair, a faca volta devagar.
+  let saidaCaso = 0;
   function focarCaso(c, ativo) {
     if (ocupado || !painel.hidden || !mascote) return;
     c.classList.toggle('aceso', ativo);
-    if (ativo) mascote.olharElemento(c);
+    clearTimeout(saidaCaso);
+    if (ativo) {
+      if (!mascote.escondido || mascote.segurando !== 'faca') MP.Som.iniciar();
+      mascote.vergonha(true);
+      mascote.pose('vergonha');
+      mascote.assobiar(true);
+      mascote.variante('assobio'); // pose desenhada: mãos para trás e lábios em bico
+      MP.Som.assobio(true);
+    } else {
+      // mantém um instante (evita reiniciar se o cursor só passou pela borda)
+      saidaCaso = setTimeout(() => {
+        if (ocupado || !painel.hidden) return;
+        mascote.vergonha(false);
+        mascote.assobiar(false);
+        mascote.variante(null);
+        MP.Som.assobio(false);
+        mascote.pose('repouso');
+      }, 450);
+    }
   }
   lista.addEventListener('pointerover', (e) => { const c = e.target.closest('.caso'); if (c && !c.contains(e.relatedTarget)) focarCaso(c, true); });
   lista.addEventListener('pointerout', (e) => { const c = e.target.closest('.caso'); if (c && !c.contains(e.relatedTarget)) focarCaso(c, false); });
@@ -255,27 +277,41 @@
   }
 
   // ----- O envelope voa da mão do mascote e vira o painel -----
+  // A cartinha sai da mão dele, voa até o centro, abre a aba e o painel sai de dentro dela.
   async function voarConvite(s) {
-    const origem = mascote.retanguloConvite();
+    const origem = mascote.retanguloCartinha();
     painel.hidden = false;
     painel.classList.add('medindo');
     const alvo = painel.getBoundingClientRect();
     painel.classList.remove('medindo');
     painel.hidden = true;
+    const w = Math.min(300, alvo.width * .72), h = w * .62;
+    const cx = alvo.left + alvo.width / 2, cy = alvo.top + alvo.height / 2;
     const voo = document.createElement('div');
     voo.className = 'convite-voo';
-    voo.innerHTML = '<span class="cv-selo">M</span>';
-    Object.assign(voo.style, { left: alvo.left + 'px', top: alvo.top + 'px', width: alvo.width + 'px', height: alvo.height + 'px' });
+    voo.innerHTML = '<span class="cv-carta"></span><span class="cv-frente"></span><span class="cv-aba"></span><span class="cv-selo">M</span>';
+    Object.assign(voo.style, { left: cx - w / 2 + 'px', top: cy - h / 2 + 'px', width: w + 'px', height: h + 'px' });
     hub.appendChild(voo);
     s.voo = voo;
     fundo.hidden = false;
-    mascote.pose('segurar');
-    const anim = voo.animate([
-      { transform: `translate(${origem.left - alvo.left}px, ${origem.top - alvo.top}px) scale(${origem.width / alvo.width}, ${origem.height / alvo.height}) rotate(-14deg)`, opacity: .9 },
-      { transform: 'translate(0, -14px) scale(1.02) rotate(1.5deg)', opacity: 1, offset: .78 },
-      { transform: 'none', opacity: 1 },
-    ], { duration: 700, easing: 'cubic-bezier(.25, .8, .25, 1)', fill: 'forwards' });
-    try { await Promise.race([anim.finished, esperar(1000)]); } catch (e) { /* cancelado */ }
+    // a mão solta a cartinha e volta rápido para trás das costas
+    mascote.bracoRapido(true);
+    mascote.pose('esconder');
+    const ox = origem.left + origem.width / 2 - cx, oy = origem.top + origem.height / 2 - cy;
+    const esc = Math.max(.15, origem.width / w);
+    const voar = voo.animate([
+      { transform: `translate(${ox}px, ${oy}px) scale(${esc}) rotate(-24deg)` },
+      { transform: 'translate(0, -18px) scale(1.06) rotate(3deg)', offset: .75 },
+      { transform: 'none' },
+    ], { duration: 760, easing: 'cubic-bezier(.3, .7, .25, 1)', fill: 'forwards' });
+    MP.Som.puf();
+    try { await Promise.race([voar.finished, esperar(1000)]); } catch (e) { /* cancelado */ }
+    mascote.bracoRapido(false);
+    if (s.pulado) return;
+    // abre: o selo cai, a aba vira para trás e a carta sobe
+    voo.classList.add('abrindo');
+    MP.Som.sinos(.3);
+    await esperar(520);
   }
 
   // ----- Sequência: destaca a entrada e o mascote apresenta o convite -----
@@ -301,30 +337,34 @@
     pularSeq.focus({ preventScroll: true });
 
     try {
-      // 1. percebe a escolha: a cabeça vira para a placa, as luzinhas acendem
-      mascote.olharElemento(placa);
-      MP.Som.sinos(.35);
-      await passo(500);
-
-      // 2. a entrada da mansão se destaca e a câmera se aproxima um pouco
+      // 1. foi pego no flagra: se a faca ainda está à mostra, esconde atrás das costas
+      clearTimeout(saidaCaso);
+      mascote.assobiar(false);
+      mascote.variante(null);
+      MP.Som.assobio(false);
+      if (!mascote.escondido) {
+        mascote.vergonha(true);
+        mascote.pose('vergonha');
+        await passo(550);
+      }
+      // 2. a entrada da mansão se destaca e a câmera se aproxima um pouco; ele se recompõe e olha para você
       hub.classList.add('em-cena');
       const zoom = base().retrato ? 1.06 : 1.14;
       moverCamera({ zoom, fx: 1160, fy: 560, puxar: .25 }, 1500);
-      await passo(650);
+      mascote.vergonha(false);
       mascote.olharFrente();
+      MP.Som.sinos(.35);
       await passo(450);
 
-      // 3. prepara (recolhe o braço) e oferece o envelope em direção ao jogador
-      mascote.pose('antecipar');
-      await passo(380);
-      mascote.pose('oferecer');
-      mascote.sacudir(.4);
-      MP.Som.sinos(.45);
-      await passo(450);
+      // 3. lá atrás, onde escondeu a faca, troca pela cartinha e a puxa para a frente
+      mascote.segurar('cartinha');
+      mascote.pose('mostrar');
+      mascote.sacudir(.3);
+      await passo(900);
       falar('Você foi convidado. <strong>Álibi não incluso.</strong>');
-      await passo(1700);
+      await passo(1500);
 
-      // 4. o envelope voa e vira o painel
+      // 4. a cartinha voa, abre e vira o painel
       calar();
       await voarConvite(s);
       if (s.pulado) return;
@@ -350,7 +390,18 @@
     calar();
     hub.classList.add('em-cena');
     if (enquadramento.zoom === 1) moverCamera({ zoom: base().retrato ? 1.06 : 1.14, fx: 1160, fy: 560, puxar: .25 }, modo === 'suave' ? 0 : 600);
-    mascote.pose('segurar');
+    // a mão vai para trás, pega a faca de novo e ela volta devagar
+    // (a reação ao "Criar sala" vai escondê-la outra vez)
+    mascote.vergonha(false);
+    mascote.assobiar(false);
+    mascote.variante(null);
+    MP.Som.assobio(false);
+    mascote.pose('esconder');
+    const pegarFaca = () => {
+      if (!mascote.segurar('faca')) { setTimeout(pegarFaca, 150); return; } // espera a mão sumir atrás do corpo
+      setTimeout(() => { if (reacao.estado === 'espera' && !painel.hidden) mascote.pose('repouso'); }, reduzido() ? 0 : 500);
+    };
+    setTimeout(pegarFaca, reduzido() ? 0 : 350);
     mascote.olharFrente();
     escolherAba(aba);
     mostrarPainel(modo);
@@ -387,7 +438,7 @@
   function abrirPainelDireto(caso, aba) {
     preencherPainel(caso, aba);
     hub.classList.add('em-cena');
-    mascote.pose('segurar');
+    mascote.pose('repouso');
     moverCamera({ zoom: base().retrato ? 1.06 : 1.14, fx: 1160, fy: 560, puxar: .25 }, 700);
     mostrarPainel('suave');
   }
