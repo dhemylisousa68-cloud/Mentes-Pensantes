@@ -176,4 +176,12 @@
   });
   $('#proxima .voltar').addEventListener('click', voltar);
   window.addEventListener('resize', () => { if (!proxima.hidden) enquadrarPorta(); });
+
+  // Vindo do "Entrar com código" do Mentes Pensantes: abre direto o formulário de código
+  if (location.hash === '#entrar') {
+    history.replaceState(null, '', location.pathname);
+    entrada.classList.add('oculto');
+    destino = 'entrar';
+    concluir();
+  }
 })();

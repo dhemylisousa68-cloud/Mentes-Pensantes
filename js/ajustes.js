@@ -1,8 +1,8 @@
-// Preferências do jogador, salvas apenas neste navegador.
+// Preferências do jogador (compartilhadas por todo o Mentes Pensantes), salvas apenas neste navegador.
 window.UC = window.UC || {};
 
 UC.Ajustes = (() => {
-  const CHAVE = 'uc_ajustes';
+  const CHAVE = 'mp_ajustes';
   const padrao = {
     musica: 60,
     efeitos: 70,

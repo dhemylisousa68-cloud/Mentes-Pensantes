@@ -4,31 +4,129 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Mentes Pensantes</title>
-  <meta name="description" content="Mentes Pensantes: jogos para pensar em grupo.">
+  <meta name="description" content="Mentes Pensantes: desconfie de tudo. Até do seu raciocínio.">
+  <link rel="icon" href="assets/logo.webp">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Kalam:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/mascote.css">
   <link rel="stylesheet" href="css/hub.css">
 </head>
 <body>
-  <header class="topo">
-    <a class="marca" href="./" aria-label="Mentes Pensantes, início">
-      <svg class="logo" viewBox="0 0 48 48" aria-hidden="true">
-        <circle cx="20" cy="20" r="13" fill="none" stroke="currentColor" stroke-width="3.5"/>
-        <path d="M29.5 29.5 L42 42" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-        <path d="M14 22c0-4 3-7 6-7s6 3 6 7M17 18.5c1.5 1 4.5 1 6 0M20 15v12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".75"/>
+
+  <!-- ============ PORTÃO (primeiro toque libera o som) ============ -->
+  <section id="portao" class="tela" hidden>
+    <button id="comecar" class="comecar">
+      <span class="comecar-icone" aria-hidden="true">?</span>
+      <span>Toque para começar</span>
+    </button>
+  </section>
+
+  <!-- ============ INTRO ============ -->
+  <section id="intro" class="tela" hidden aria-label="Abertura">
+    <div class="nevoa n1"></div><div class="nevoa n2"></div>
+    <div class="holofote"></div>
+    <div class="intro-mascote" id="mascote-intro"></div>
+    <div class="intro-titulo">
+      <img class="intro-logo" src="assets/logo.webp" alt="Mentes Pensantes">
+      <p class="intro-lema">Desconfie de tudo. Até do seu raciocínio.</p>
+    </div>
+    <button id="pular-intro" class="pular">Pular ›</button>
+  </section>
+
+  <!-- ============ TELA PRINCIPAL ============ -->
+  <section id="hub" class="tela" hidden>
+    <div class="quadro" aria-hidden="true">
+      <div class="luz-luminaria"></div>
+      <div class="giz g1">P(A|B) = ?</div>
+      <div class="giz g2">x² + y² = ?</div>
+      <div class="giz g3">Δ = b² − 4ac</div>
+      <div class="giz g4">☑<br>☑<br>☐</div>
+      <svg class="fios" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <polyline points="44,18 56,9 63,30 86,14 96,34"/>
+        <polyline points="44,18 63,30 72,46"/>
+        <polyline points="86,14 82,38"/>
       </svg>
-      <span>Mentes Pensantes</span>
-    </a>
-  </header>
+      <div class="polaroid p-gato" data-recorte="635,178,196,176"></div>
+      <div class="polaroid p-biscoito" data-recorte="822,38,190,178"></div>
+      <div class="polaroid p-pata" data-recorte="1336,86,178,168"></div>
+      <div class="polaroid p-cafe" data-recorte="1458,246,210,212"></div>
+      <div class="post-it pi1">?</div>
+      <div class="post-it pi2">?</div>
+      <div class="interrogacao-giz">?</div>
+      <div class="livros l1"><i></i><i></i><i></i></div>
+      <div class="livros l2"><i></i><i></i></div>
+      <div class="caneca"><span>🧠</span></div>
+    </div>
 
-  <main>
-    <nav class="abas" role="tablist" aria-label="Categorias de jogos"></nav>
-    <section id="painel" role="tabpanel"></section>
-  </main>
+    <div class="icones-topo">
+      <button id="btn-som" class="icone" aria-label="Som ligado" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="ondas" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="mudo" d="M16 9l6 6M22 9l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button id="btn-config" class="icone" aria-label="Configurações">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.4-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.7a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.4 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.7h4l.4-2.7a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>
+      </button>
+    </div>
 
-  <footer class="rodape">Mentes Pensantes · jogos para pensar em grupo</footer>
+    <div class="lado-esq">
+      <h1 class="marca"><img src="assets/logo.webp" alt="Mentes Pensantes"></h1>
+      <p class="lema-papel">Desconfie de tudo. Até do seu raciocínio.</p>
+      <div class="acoes">
+        <button id="btn-jogar" class="botao botao-amarelo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm7 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM9 13c-4 0-7 2-7 5v2h14v-2c0-3-3-5-7-5zm7 0c-.6 0-1.2.1-1.7.2 1.7 1.1 2.7 2.7 2.7 4.8v2h5v-2c0-2.8-2.6-5-6-5z"/></svg>
+          Jogar com amigos
+        </button>
+        <button id="btn-codigo" class="botao botao-creme">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z"/><path fill="currentColor" d="M7 12h1.6M11 12h1.6M15 12h1.6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          Entrar com código
+        </button>
+      </div>
+    </div>
 
+    <div class="palco">
+      <div class="balao" id="balao" hidden>
+        <p class="balao-texto"></p>
+        <div class="balao-acoes"></div>
+      </div>
+      <div class="mascote-hub" id="mascote-hub"></div>
+    </div>
+
+    <section class="casos" aria-label="Escolha seu caso">
+      <h2 class="casos-titulo">Escolha <br>seu caso <span class="seta" aria-hidden="true">⤳</span></h2>
+      <div class="casos-lista" id="casos-lista"></div>
+    </section>
+
+    <div class="cortina" id="cortina"></div>
+  </section>
+
+  <!-- ============ CONFIGURAÇÕES ============ -->
+  <dialog id="config" aria-labelledby="config-titulo">
+    <form method="dialog" class="painel-config">
+      <h2 id="config-titulo">Configurações</h2>
+      <label class="linha">Volume da música
+        <input type="range" min="0" max="100" step="5" name="musica"><output></output>
+      </label>
+      <label class="linha">Volume dos efeitos
+        <input type="range" min="0" max="100" step="5" name="efeitos"><output></output>
+      </label>
+      <label class="linha alternar">Movimento reduzido
+        <input type="checkbox" name="reduzido">
+      </label>
+      <fieldset class="linha">
+        <legend>Tamanho do texto</legend>
+        <div class="segmentos">
+          <label><input type="radio" name="texto" value="p" aria-label="Texto pequeno"><span>A</span></label>
+          <label><input type="radio" name="texto" value="m" aria-label="Texto médio"><span>A</span></label>
+          <label><input type="radio" name="texto" value="g" aria-label="Texto grande"><span>A</span></label>
+        </div>
+      </fieldset>
+      <button class="botao botao-amarelo" value="ok">Fechar</button>
+    </form>
+  </dialog>
+
+  <script src="js/ajustes.js"></script>
+  <script src="js/som-hub.js"></script>
+  <script src="js/mascote.js"></script>
   <script src="js/hub.js"></script>
 </body>
 </html>
