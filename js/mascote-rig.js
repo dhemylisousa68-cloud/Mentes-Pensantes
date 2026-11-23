@@ -38,6 +38,9 @@ MP.Rig = (() => {
     antecipar: { braco: 5, bracoEsc: .96, inclina: 1.2 },
     oferecer: { braco: -9, bracoEsc: 1.16, inclina: -2.2 },
     segurar: { braco: -3, bracoEsc: 1.05, inclina: -.8 },
+    // provisório: com a arte atual o braço só recolhe; com as camadas novas, a mão (com a faca) vai para trás do tronco
+    esconder: { braco: 6, bracoEsc: .93, inclina: 1.6 },
+    disfarcar: { braco: 4, bracoEsc: .95, inclina: -1.3 },
   };
 
   let contador = 0;
@@ -171,6 +174,15 @@ MP.Rig = (() => {
         this.olharPara(r.left + r.width / 2, r.top + r.height / 2);
       },
       olharFrente() { olharCabeca = 0; },
+      // cabeça rápida (olhadela) ou normal; a mudança parte sempre da posição atual
+      cabecaRapida(rapida) { ossos.cabeca.k = rapida ? 260 : 90; ossos.cabeca.d = rapida ? 28 : 15; },
+      // Ganchos para as camadas que ainda faltam (olhos, pálpebras, sobrancelhas, boca).
+      // O estado fica registrado no SVG; quando a arte chegar, cada camada lê estes valores.
+      expressao({ sobrancelha, sorriso } = {}) {
+        if (sobrancelha !== undefined) svg.dataset.sobrancelha = sobrancelha ? '1' : '0';
+        if (sorriso !== undefined) svg.dataset.sorriso = String(sorriso);
+      },
+      get expressaoAtual() { return { sobrancelha: svg.dataset.sobrancelha === '1', sorriso: Number(svg.dataset.sorriso || 0) }; },
       pose(nome) {
         const p = POSES[nome] || POSES.repouso;
         ossos.braco.alvo = p.braco;

@@ -46,3 +46,53 @@ deformando a imagem.
 
 Os nomes dos arquivos podem ser outros; o importante é que cada parte venha separada e que
 o que fica escondido atrás dela esteja pintado.
+
+## Pacote de camadas para a cena da faca ("Criar sala")
+
+A folha com quatro poses (desconfiado, surpreso, "shh" e oferecendo o envelope) é ótima
+como referência de expressões, mas são desenhos inteiros e diferentes entre si: não dá para
+passar de um para o outro sem saltos, e nenhum tem a faca. Para a atuação pedida, a arte
+precisa vir separada assim.
+
+**Formato:** PNGs com fundo transparente, todos com o **mesmo tamanho de tela** (sugestão:
+2048 × 3072) e cada peça **no lugar exato** em que fica na pose de espera, como camadas de um
+mesmo arquivo exportadas uma a uma. Um PSD com as camadas nomeadas também serve.
+O que fica escondido atrás de outra peça precisa estar **pintado** (ex.: o casaco atrás do
+braço, o pescoço sob a gola, a parte de cima da bota dentro da calça).
+
+| Grupo | Arquivos |
+| --- | --- |
+| Corpo | `tronco.png` (casaco inteiro, sem braços), `gola.png` |
+| Pernas | `perna-esq.png`, `perna-dir.png`, `bota-esq.png`, `bota-dir.png` |
+| Braço da faca | `braco-dir.png`, `antebraco-dir.png`, `mao-dir.png` (fechada, segurando o cabo) |
+| Faca | `faca.png` (lâmina para baixo, com respingos estilizados), desenhada já na posição da mão |
+| Outro braço | `braco-esq.png`, `antebraco-esq.png`, `mao-esq.png` |
+| Cabeça | `cabeca.png` (o "M" com a interrogação, **sem** olhos, boca e sobrancelhas) |
+| Olhos | `olho-esq.png`, `olho-dir.png` (só o branco), `pupila-esq.png`, `pupila-dir.png` |
+| Pálpebras | `palpebra-esq-1..4.png` e `palpebra-dir-1..4.png` (aberta → meio → quase → fechada) |
+| Sobrancelhas | `sobrancelha-esq.png`, `sobrancelha-dir.png` (neutras; erguer é feito no código) |
+| Boca | `boca-0.png` (neutra) até `boca-4.png` (sorriso demoníaco assimétrico), mesma posição |
+| Gorro | `gorro.png`, `gorro-ponta.png`, `pompom.png` |
+
+**Esconder a faca:** a mão com a faca passa por trás do tronco. Para isso basta que o braço
+direito venha inteiro e separado; o código troca a ordem das camadas no meio do gesto, e
+o tronco cobre a faca de verdade (sem transparência).
+
+**Opcional, deixa o gesto mais rico:** uma pose intermediária do braço já dobrado para trás
+(`braco-dir-tras.png` + `antebraco-dir-tras.png`), caso o cotovelo dobrado fique estranho só
+girando as peças.
+
+## Reação ao "Criar sala" (`js/reacao-botao.js`)
+
+A lógica já está pronta e funcionando com a arte atual; quando as camadas chegarem, só a
+parte visual muda.
+
+- Estados: espera → atenção → esconder → aguardando → (voltando → espera) ou abrir.
+- Entra a 120 px do botão, com foco pelo teclado ou ao tocar no celular; só sai depois de
+  220 px e de um instante longe (não reinicia na borda).
+- Sequência de ~1,2 s com movimentos sobrepostos: olhadela ao botão, volta ao jogador,
+  sobrancelha, sorriso em 4 etapas (começa antes de a mão sumir) e a mão indo para trás.
+- O clique nunca espera o gesto.
+- Hoje, sem as camadas, aparecem só a olhadela (cabeça), o braço recolhendo e o corpo
+  se inclinando. Sobrancelha e sorriso ficam registrados em `data-sobrancelha` e
+  `data-sorriso` no SVG do mascote, prontos para as camadas novas.

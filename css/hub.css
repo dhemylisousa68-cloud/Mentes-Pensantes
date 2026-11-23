@@ -245,7 +245,12 @@ html.pausado *, html.pausado *::before, html.pausado *::after { animation-play-s
 }
 
 /* ================= PAINEL DA SALA ================= */
-.painel-fundo { position: absolute; inset: 0; z-index: 50; background: rgba(4, 5, 10, .55); animation: surgir .4s ease both; }
+.painel-fundo {
+  position: absolute; inset: 0; z-index: 50; background: rgba(4, 5, 10, .55); animation: surgir .4s ease both;
+  /* o mascote continua visível ao lado do painel, para reagir */
+  -webkit-mask-image: radial-gradient(ellipse var(--masc-rx, 14%) var(--masc-ry, 34%) at var(--masc-x, 80%) var(--masc-y, 60%), transparent 50%, #000 95%);
+  mask-image: radial-gradient(ellipse var(--masc-rx, 14%) var(--masc-ry, 34%) at var(--masc-x, 80%) var(--masc-y, 60%), transparent 50%, #000 95%);
+}
 .painel-fundo[hidden] { display: none; }
 @keyframes surgir { from { opacity: 0; } to { opacity: 1; } }
 .painel-sala {

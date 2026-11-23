@@ -29,7 +29,7 @@
   const painel = $('#painel-sala'), fundo = $('#painel-fundo');
   const pularSeq = $('#pular-seq'), clarao = $('#clarao');
 
-  let mascote = null, neve = null;
+  let mascote = null, neve = null, reacao = null;
   let selecionado = null, ocupado = false, seq = null;
 
   function vistaNestaSessao() { try { return sessionStorage.getItem('mp_intro') === '1'; } catch (e) { return false; } }
@@ -108,6 +108,14 @@
       </button>`).join('');
     mascote = MP.Rig.criar($('#mascote'), { reduzido });
     neve = MP.Neve.iniciar($('#neve'), { reduzido });
+    // reação ao "Criar sala": só vale com o painel aberto na aba de criar
+    reacao = MP.ReacaoBotao.ligar({
+      botao: $('#ps-criar button[type="submit"]'),
+      mascote,
+      reduzido,
+      ativo: () => !painel.hidden && !$('#ps-criar').hidden && !ocupado,
+      poseEspera: () => 'segurar',
+    });
     enquadrar();
     window.addEventListener('resize', enquadrar);
   }
@@ -221,6 +229,7 @@
     });
     $('#ps-criar').hidden = aba !== 'criar';
     $('#ps-entrar').hidden = aba !== 'entrar';
+    if (reacao && aba !== 'criar') reacao.reiniciar();
     painel.querySelector('.ps-aviso').hidden = true;
   }
   function mostrarPainel(modo) {
@@ -239,6 +248,7 @@
     fundo.hidden = true;
     hub.classList.remove('em-cena');
     mascote.pose('repouso');
+    reacao.reiniciar();
     moverCamera({ zoom: 1, puxar: 0 }, 900);
     if (trocar) { selecionado = null; marcarCaso(null); }
     (lista.querySelector('.caso') || $('#btn-jogar')).focus({ preventScroll: true });
@@ -353,6 +363,7 @@
     painel.hidden = true;
     fundo.hidden = true;
     hub.classList.add('saindo');
+    reacao.abrir();
     if (reduzido()) { location.href = caso.caminho; return; }
     MP.Som.atravessar();
     MP.Som.ambiente(false);
@@ -492,7 +503,11 @@
   });
 
   // a cabeça acompanha o ponteiro
-  function seguir(e) { if (mascote && !hub.hidden && !ocupado && painel.hidden) mascote.olharPara(e.clientX, e.clientY); }
+  function seguir(e) {
+    if (!mascote || hub.hidden || ocupado) return;
+    if (!painel.hidden && reacao.estado !== 'espera') return; // a reação cuida do olhar
+    mascote.olharPara(e.clientX, e.clientY);
+  }
   window.addEventListener('pointermove', seguir, { passive: true });
   window.addEventListener('pointerdown', seguir, { passive: true });
 
