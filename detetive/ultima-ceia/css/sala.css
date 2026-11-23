@@ -196,3 +196,14 @@
 .sala-aviso p { margin: 0; color: var(--texto); }
 .sala-aviso .sala-sair { align-self: center; }
 .sala-demo strong { color: var(--ouro-claro); letter-spacing: .12em; }
+
+/* menu do anfitrião (botão direito num jogador) */
+.menu-jogador {
+  position: fixed; z-index: 60; min-width: 190px; padding: .4rem; display: flex; flex-direction: column; gap: .2rem;
+  background: #1a1013; border: 1px solid var(--linha); border-radius: 10px; box-shadow: 0 14px 40px rgba(0, 0, 0, .7);
+  animation: surgir .15s ease both;
+}
+.menu-jogador p { margin: .2rem .5rem .35rem; font-size: .8rem; color: var(--suave); }
+.menu-jogador button { font: inherit; text-align: left; padding: .55rem .7rem; border: 0; border-radius: 7px; background: transparent; color: var(--texto); cursor: pointer; }
+.menu-jogador button:hover, .menu-jogador button:focus-visible { background: rgba(255, 255, 255, .07); outline: none; }
+.menu-jogador .tirar { color: var(--erro); font-weight: 600; }

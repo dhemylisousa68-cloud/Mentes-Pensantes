@@ -57,6 +57,9 @@ UC.Online = (() => {
     const t = String(erro && (erro.message || erro) || '');
     if (t.includes('SALA_NAO_EXISTE')) return 'Não existe sala com esse código. Confira as letras e tente de novo.';
     if (t.includes('SALA_CHEIA')) return 'Essa sala já está cheia.';
+    if (t.includes('EXPULSO')) return 'O anfitrião tirou você desta sala.';
+    if (t.includes('NAO_SE_REMOVE')) return 'Para sair, use "Sair para o Mentes Pensantes".';
+    if (t.includes('remover_jogador')) return 'Falta rodar o arquivo supabase/03-remover-jogador.sql no Supabase.';
     if (t.includes('OCUPADO')) return 'Alguém acabou de escolher esse personagem.';
     if (t.includes('SO_ANFITRIAO')) return 'Só o anfitrião (♛) pode fazer isso.';
     if (t.includes('SEM_CONEXAO') || t.includes('Failed to fetch')) return 'Sem conexão com o servidor. Verifique a internet e recarregue a página.';

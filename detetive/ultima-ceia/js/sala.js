@@ -63,7 +63,10 @@ UC.Sala = (() => {
       render();
     } catch (e) {
       const t = String(e && e.message || e);
-      if (t.includes('SALA_NAO_EXISTE') || t.includes('SALA_CHEIA')) aviso(UC.Online.mensagem(e), true);
+      if (t.includes('SALA_NAO_EXISTE') || t.includes('SALA_CHEIA') || t.includes('EXPULSO')) {
+        if (t.includes('EXPULSO')) { try { sessionStorage.removeItem('mp_sala'); } catch (err) { /* ignora */ } intervalos.forEach(clearInterval); }
+        aviso(UC.Online.mensagem(e), true);
+      }
       // falha de rede: tenta de novo no próximo ciclo
     } finally {
       atualizando = false;
@@ -296,7 +299,7 @@ UC.Sala = (() => {
       const minha = dono && dono.voce;
       const classes = ['bola', minha ? 'minha' : '', dono && !minha ? 'ocupada' : '', foco.id === p.id ? 'em-foco' : ''].join(' ');
       const rotulo = dono ? (minha ? 'Você' : dono.nome) : 'Livre';
-      return `<button class="${classes}" data-id="${p.id}" aria-pressed="${!!minha}" aria-label="${esc(p.nome)}: ${rotulo}">
+      return `<button class="${classes}" data-id="${p.id}" data-dono="${dono && !minha ? esc(dono.id) : ''}" aria-pressed="${!!minha}" aria-label="${esc(p.nome)}: ${rotulo}">
         ${bolaHTML(p)}
         <span class="bola-nome">${esc(p.nome.replace(/^Personagem /, "Nº "))}</span>
         <span class="bola-dono">${esc(rotulo)}${unidade.includes('+') ? ' · dupla' : ''}</span>
@@ -306,7 +309,7 @@ UC.Sala = (() => {
     const jogadores = st.jogadores.map((x) => {
       const p = x.personagem && UC.porId(x.personagem);
       const estado = x.pronto ? '<span class="ok">Pronto ✓</span>' : (p ? 'Lendo a carta…' : 'Escolhendo…');
-      return `<li class="${x.voce ? 'eu' : ''}">
+      return `<li class="${x.voce ? 'eu' : ''}" data-usuario="${x.voce ? '' : esc(x.id)}">
         ${p ? bolaHTML(p, 'mini') : '<span class="bola-esfera mini vazia"><span>?</span></span>'}
         <span class="j-nome">${esc(x.nome)}${x.voce ? ' (você)' : ''}${x.anfitriao ? ' <span class="coroa" title="Anfitrião">♛</span>' : ''}</span>
         <span class="j-estado">${p ? esc(p.nome) + (x.unidade.includes('+') ? ' + ' + esc(UC.porId(UC.parceiroDe(p.id, st.max)).nome) : '') + ' · ' : ''}${estado}</span>
@@ -409,6 +412,47 @@ UC.Sala = (() => {
       navigator.clipboard?.writeText(st.codigo).then(() => dica('Código copiado.'), () => dica(`Código: ${st.codigo}`));
     }
   });
+
+  // ---------- anfitrião: botão direito (ou toque longo) tira o jogador da sala ----------
+  let menu = null;
+  function fecharMenu() { menu?.remove(); menu = null; }
+  function abrirMenu(x, y, alvo) {
+    fecharMenu();
+    menu = document.createElement('div');
+    menu.className = 'menu-jogador';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML = `<p>${esc(alvo.nome)}${alvo.teste ? ' (teste)' : ''}</p>
+      <button type="button" role="menuitem" class="tirar">Tirar da sala</button>
+      <button type="button" role="menuitem" class="cancelar">Cancelar</button>`;
+    document.body.appendChild(menu);
+    const w = menu.offsetWidth, h = menu.offsetHeight;
+    menu.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, x))}px`;
+    menu.style.top = `${Math.max(8, Math.min(innerHeight - h - 8, y))}px`;
+    menu.querySelector('.cancelar').addEventListener('click', fecharMenu);
+    menu.querySelector('.tirar').addEventListener('click', () => { fecharMenu(); tirar(alvo); });
+    menu.querySelector('.tirar').focus();
+  }
+  function tirar(alvo) {
+    som('clique');
+    if (!online) { st.jogadores = st.jogadores.filter((j) => j !== alvo); salvar(); render(); return; }
+    st.jogadores = st.jogadores.filter((j) => j !== alvo); // some na hora; o servidor confirma
+    render();
+    dica(`${alvo.nome} saiu da sala.`);
+    acaoOnline('remover_jogador', { p_usuario: alvo.id });
+  }
+  document.addEventListener('contextmenu', (e) => {
+    if (!raiz || raiz.hidden || !st) return;
+    const el = e.target.closest('#sala .bola[data-dono]:not([data-dono=""]), #sala .sala-jogadores li[data-usuario]:not([data-usuario=""])');
+    if (!el) return;
+    e.preventDefault();
+    if (online && !st.souAnfitriao) { dica('Só o anfitrião (♛) pode tirar alguém da sala.'); return; }
+    if (!online && !st.souAnfitriao) return;
+    const id = el.dataset.dono || el.dataset.usuario;
+    const alvo = st.jogadores.find((j) => String(j.id) === id && !j.voce);
+    if (alvo) abrirMenu(e.clientX, e.clientY, alvo);
+  });
+  document.addEventListener('pointerdown', (e) => { if (menu && !menu.contains(e.target)) fecharMenu(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menu) { e.stopPropagation(); fecharMenu(); } }, true);
 
   return { abrir };
 })();
