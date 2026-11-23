@@ -171,58 +171,55 @@ window.UC = window.UC || {};
       </div>`).join('');
     const els = [...raiz.children];
 
-    let timer = 0, emCiclo = false, pausas = 0, ultimoClique = 0;
-    const pausado = () => pausas > 0 || document.hidden || reduzido() || performance.now() - ultimoClique < 2500;
+    // O escuro com os olhos vermelhos só acontece enquanto o cursor (ou o foco) está no botão "Abrir a porta".
+    // entrar(): as velas enfraquecem e apagam, a sala escurece e os olhos acendem; sair(): tudo reacende.
+    // Cada passo parte do estado atual, então entrar e sair rápido não deixa nada preso no meio.
+    let pausas = 0, alvo = false, versao = 0;
+    const bloqueado = () => pausas > 0 || reduzido();
 
-    function agendar() {
-      clearTimeout(timer);
-      timer = setTimeout(tentar, 5000 + Math.random() * 2000); // a cada ~6 s (5–7 s)
+    async function entrar() {
+      alvo = true;
+      if (bloqueado()) return;
+      const v = ++versao;
+      els.forEach((e) => { e.classList.remove('acendendo', 'apagada'); e.classList.add('fraca'); });
+      await esperar(220);
+      if (v !== versao || !alvo) return;
+      els.forEach((e) => { e.classList.remove('fraca'); e.classList.add('apagada'); });
+      UC.Som.sopro?.();
+      cena.classList.add('escura');
+      await esperar(380);
+      if (v !== versao || !alvo) return;
+      cena.classList.add('olhos');
+      UC.Som.sussurro?.();
     }
-    function tentar() {
-      if (pausado() || emCiclo) { timer = setTimeout(tentar, 2000); return; }
-      ciclo();
-    }
-    async function ciclo() {
-      emCiclo = true;
-      // uma, duas ou as três velas
-      const n = 1 + Math.floor(Math.random() * 3);
-      const escolhidas = [...els].sort(() => Math.random() - .5).slice(0, n);
-      const interromper = () => pausas > 0 || document.hidden || reduzido();
-      try {
-        escolhidas.forEach((e) => e.classList.add('fraca'));
-        await esperar(900);
-        if (interromper()) return;
-        escolhidas.forEach((e) => { e.classList.remove('fraca'); e.classList.add('apagada'); });
-        UC.Som.sopro?.();
-        cena.classList.add('escura');
-        await esperar(900);
-        if (interromper()) return;
-        cena.classList.add('olhos');
-        UC.Som.sussurro?.();
-        await esperar(1900);
-        cena.classList.remove('olhos');
-        await esperar(350);
-        escolhidas.forEach((e) => { e.classList.remove('apagada'); e.classList.add('acendendo'); });
-        UC.Som.acender?.();
-        cena.classList.remove('escura');
-        await esperar(900);
-      } finally {
-        restaurar();
-        emCiclo = false;
-        agendar();
-      }
+    async function sair() {
+      alvo = false;
+      const v = ++versao;
+      const estavaEscuro = cena.classList.contains('escura');
+      cena.classList.remove('olhos', 'escura');
+      els.forEach((e) => { e.classList.remove('fraca', 'apagada'); if (estavaEscuro) e.classList.add('acendendo'); });
+      if (estavaEscuro) UC.Som.acender?.();
+      await esperar(900);
+      if (v === versao) els.forEach((e) => e.classList.remove('acendendo'));
     }
     function restaurar() {
+      versao++;
       cena.classList.remove('escura', 'olhos');
       els.forEach((e) => e.classList.remove('fraca', 'apagada', 'acendendo'));
     }
     // pausa enquanto a porta anima, configurações abertas etc. (pode empilhar)
-    function pausar() { pausas++; if (emCiclo) restaurar(); }
+    function pausar() { pausas++; restaurar(); }
     function retomar() { pausas = Math.max(0, pausas - 1); }
 
-    window.addEventListener('pointerdown', () => { ultimoClique = performance.now(); }, { passive: true });
+    // liga ao botão "Abrir a porta" (mouse e teclado; no celular não há hover, então não escurece)
+    const botao = document.querySelector('[data-acao="sala"]');
+    if (botao) {
+      botao.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') entrar(); });
+      botao.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') sair(); });
+      botao.addEventListener('focus', () => { if (botao.matches(':focus-visible')) entrar(); });
+      botao.addEventListener('blur', sair);
+    }
     document.addEventListener('visibilitychange', () => document.documentElement.classList.toggle('pausado', document.hidden));
-    agendar();
-    return { pausar, retomar, ciclo, restaurar };
+    return { pausar, retomar, entrar, sair, restaurar };
   })();
 })();

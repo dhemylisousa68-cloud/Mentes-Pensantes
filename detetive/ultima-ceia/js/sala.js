@@ -124,13 +124,55 @@ UC.Sala = (() => {
   }
 
   // ---------- tela ----------
-  // Cores provisórias das bolas, até a arte dos personagens ser definida
-  const CORES_BOLA = {
-    alice: '#d9475a', bruno: '#4a74b8', cecilia: '#33a67c', diego: '#8a5cf0', eva: '#c052d0',
-    felipe: '#d9a23a', isadora: '#2f93dc', lucas: '#8796a6', maya: '#e3763c', nicolas: '#5cbf4a',
-  };
-  function bolaHTML(p, tamanho = '') {
-    return `<span class="bola-esfera ${tamanho}" style="--cor:${CORES_BOLA[p.id] || p.roupa}"><span>${esc(p.nome[0])}</span></span>`;
+  function bolaHTML(p, tamanho = "") {
+    return `<span class="bola-esfera retrato ${tamanho}"><img src="${p.retrato}" alt="" draggable="false" loading="lazy"></span>`;
+  }
+  // boneco em pixel do personagem em foco, com a animação própria dele
+  function bonecoHTML(p) {
+    if (p.folha) {
+      // boneco com animação quadro a quadro (folha de poses)
+      return `<div class="palco-boneco" data-id="${p.id}">
+        <div class="boneco boneco-folha chega" role="img" aria-label="Boneco de ${esc(p.nome)}" style="background-image:url(${p.folha.imagem});--proporcao:${p.folha.proporcao || '320 / 500'};--escala:${p.folha.escala || 1};background-size:${p.folha.total * 100}% 100%">
+          <svg class="coracao" viewBox="0 0 8 6" shape-rendering="crispEdges" aria-hidden="true"><path fill="#f15275" d="M1 0h2v1h2V0h2v1h1v2H7v1H6v1H5v1H3V5H2V4H1V3H0V1h1z"/></svg>
+        </div><span class="boneco-sombra"></span></div>`;
+    }
+    return `<div class="palco-boneco" data-id="${p.id}"><img class="boneco chega anim-${p.animBoneco}" src="${p.boneco}" alt="Boneco de ${esc(p.nome)}" draggable="false"><span class="boneco-sombra"></span></div>`;
+  }
+
+  // Toca a folha de poses: troca o quadro pela linha do tempo e solta o coração na hora do beijo.
+  // Repete com uma pausa entre uma vez e outra; para sozinho quando o boneco sai da tela.
+  function animarFolha(raizBoneco) {
+    const el = raizBoneco?.querySelector('.boneco-folha');
+    if (!el || el.dataset.tocando) return;
+    el.dataset.tocando = '1';
+    const p = UC.porId(raizBoneco.dataset.id);
+    const { quadros, coracao, duracao, pausa, total, seq, fps } = p.folha;
+    const ch = el.querySelector('.coracao');
+    let inicio = performance.now() + 500; // depois do pulinho de chegada
+    function quadro(agora) {
+      if (!el.isConnected) return;
+      const calmo = UC.Ajustes.get('reduzido');
+      let f, t;
+      if (seq) {
+        // loop contínuo numa sequência fixa de poses
+        // tempo dentro da volta atual (o coração e outros efeitos se repetem a cada volta)
+        t = agora < inicio || calmo ? -1 : (agora - inicio) % ((seq.length * 1000) / fps);
+        f = t < 0 ? seq[0] : seq[Math.floor((t * fps) / 1000) % seq.length];
+      } else {
+        t = (agora - inicio) % (duracao + pausa);
+        if (agora < inicio || calmo) t = -1;
+        f = t < 0 ? 0 : (quadros.find(([ate]) => t < ate) || [0, 0])[1];
+      }
+      el.style.backgroundPositionX = `${(f / (total - 1)) * 100}%`;
+      if (coracao && t >= coracao.de && t < coracao.ate) {
+        const q = (t - coracao.de) / (coracao.ate - coracao.de);
+        ch.style.opacity = Math.sin(Math.PI * q).toFixed(2);
+        ch.style.left = `${((coracao.x + q * coracao.dx) / 320) * 100}%`;
+        ch.style.top = `${((coracao.y + q * coracao.dy) / 500) * 100}%`;
+      } else ch.style.opacity = 0;
+      requestAnimationFrame(quadro);
+    }
+    requestAnimationFrame(quadro);
   }
 
   // Momento 2 da porta: todos logados, com personagem escolhido e prontos.
@@ -168,7 +210,7 @@ UC.Sala = (() => {
       const rotulo = dono ? (minha ? 'Você' : dono.nome) : 'Livre';
       return `<button class="${classes}" data-id="${p.id}" aria-pressed="${!!minha}" aria-label="${esc(p.nome)}: ${rotulo}">
         ${bolaHTML(p)}
-        <span class="bola-nome">${esc(p.nome)}</span>
+        <span class="bola-nome">${esc(p.nome.replace(/^Personagem /, "Nº "))}</span>
         <span class="bola-dono">${esc(rotulo)}${unidade.includes('+') ? ' · dupla' : ''}</span>
       </button>`;
     }).join('');
@@ -184,12 +226,14 @@ UC.Sala = (() => {
     }).join('');
 
     let dicaTexto;
-    if (!j.personagem) dicaTexto = 'Toque em uma bola para escolher seu personagem.';
+    if (!j.personagem) dicaTexto = 'Toque em uma foto para escolher seu personagem.';
     else if (!j.pronto) dicaTexto = 'Quando estiver pronto, marque "Estou pronto".';
     else if (!cheia) dicaTexto = `Faltam ${st.max - st.jogadores.length} jogador(es). Use "Adicionar jogador de teste" para simular.`;
     else if (!todosProntos) dicaTexto = 'Aguardando todos ficarem prontos.';
     else dicaTexto = 'Todos prontos! A porta vai se abrir…';
 
+    // o boneco em foco continua o mesmo elemento entre atualizações (a animação não reinicia)
+    const bonecoAnterior = raiz.querySelector(".palco-boneco");
     raiz.innerHTML = `
       <div class="sala-painel">
         <header class="sala-topo">
@@ -203,14 +247,14 @@ UC.Sala = (() => {
             <button class="btn btn-discreto copiar" type="button">Copiar</button>
           </div>
         </header>
-        <p class="sala-demo">Versão de demonstração: ainda sem servidor. Os outros jogadores são simulados, e as bolas ficam no lugar dos personagens até a arte deles ser definida.</p>
+        <p class="sala-demo">Versão de demonstração: ainda sem servidor. Os outros jogadores são simulados. Toque numa foto para ver o boneco que vai para o jogo.</p>
 
         <div class="sala-corpo">
           <section class="sala-bolas" aria-label="Personagens">${bolas}</section>
 
           <aside class="sala-lado">
             <div class="sala-detalhe">
-              ${bolaHTML(foco, 'grande')}
+              ${bonecoHTML(foco)}
               <div>
                 <h3>${esc(foco.nome)}</h3>
                 <p>${esc(foco.descricao)}</p>
@@ -234,6 +278,11 @@ UC.Sala = (() => {
 
         <a class="sala-sair" href="../../">‹ Sair para o Mentes Pensantes</a>
       </div>`;
+    const bonecoNovo = raiz.querySelector('.palco-boneco');
+    if (bonecoAnterior && bonecoNovo && bonecoAnterior.dataset.id === bonecoNovo.dataset.id) {
+      bonecoNovo.replaceWith(bonecoAnterior);
+    }
+    animarFolha(raiz.querySelector('.palco-boneco'));
   }
 
   // ---------- abrir ----------

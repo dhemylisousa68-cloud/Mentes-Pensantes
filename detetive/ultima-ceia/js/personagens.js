@@ -2,18 +2,133 @@
 // As cartas privadas NÃO ficam aqui: elas vivem no Supabase (ou em segredos/ no modo demonstração).
 window.UC = window.UC || {};
 
+// Cada vaga tem um retrato (para escolher) e um boneco em pixel (o que vai para o jogo).
+// Os nomes ainda não foram definidos: "nome" é provisório e pode ser trocado aqui sem mexer no resto.
+// "id" é só a chave interna da vaga (usada nas duplas abaixo).
+// "animBoneco" escolhe a animação do boneco (css/sala.css → .boneco.anim-*).
 UC.PERSONAGENS = [
-  { id: 'alice',   nome: 'Alice',   descricao: 'Observadora, próxima de Gabriel, carrega um celular antigo.', acao: 'Segura o celular e olha para a porta.', anim: 'olhar',    prop: '📱', pele: '#e8b896', cabelo: '#3b2416', estilo: 'longo',    roupa: '#7a2e3a' },
-  { id: 'bruno',   nome: 'Bruno',   descricao: 'Impulsivo, tenta proteger os amigos, usa jaqueta escura.',     acao: 'Cruza os braços.',                       anim: 'bracos',   prop: '',   pele: '#c68a5e', cabelo: '#1c1410', estilo: 'curto',    roupa: '#23262f' },
-  { id: 'cecilia', nome: 'Cecília', descricao: 'Atenta a sons, evita conflitos.',                              acao: 'Inclina a cabeça para ouvir.',           anim: 'inclinar', prop: '',   pele: '#f1c9a5', cabelo: '#a0522d', estilo: 'coque',    roupa: '#3d5a4a' },
-  { id: 'diego',   nome: 'Diego',   descricao: 'Conhece equipamentos e câmeras.',                              acao: 'Ajusta um pequeno rádio.',               anim: 'ajustar',  prop: '📻', pele: '#8d5a3b', cabelo: '#0f0d0c', estilo: 'raspado',  roupa: '#4a4f63' },
-  { id: 'eva',     nome: 'Eva',     descricao: 'Curiosa e habilidosa com objetos.',                            acao: 'Gira uma pequena chave.',                anim: 'girar',    prop: '🔑', pele: '#f0c8a8', cabelo: '#d9a441', estilo: 'longo',    roupa: '#5b3a6e' },
-  { id: 'felipe',  nome: 'Felipe',  descricao: 'Conhece fotografia e tenta parecer calmo.',                    acao: 'Examina uma câmera.',                    anim: 'examinar', prop: '📷', pele: '#d9a07a', cabelo: '#4a3020', estilo: 'curto',    roupa: '#6b5a3a' },
-  { id: 'isadora', nome: 'Isadora', descricao: 'Amiga de Laura, desconfiada de Helena.',                       acao: 'Segura um envelope.',                    anim: 'segurar',  prop: '✉️', pele: '#7a4a32', cabelo: '#1a1210', estilo: 'cacheado', roupa: '#2f4b6e' },
-  { id: 'lucas',   nome: 'Lucas',   descricao: 'Observador, fala pouco.',                                      acao: 'Olha por cima do ombro.',                anim: 'ombro',    prop: '',   pele: '#e6b08a', cabelo: '#2b2b2b', estilo: 'curto',    roupa: '#3a3a40' },
-  { id: 'maya',    nome: 'Maya',    descricao: 'Guarda lembranças em áudio.',                                  acao: 'Testa os fones.',                        anim: 'fones',    prop: '🎧', pele: '#b97a56', cabelo: '#2a1a12', estilo: 'longo',    roupa: '#8a5a2b' },
-  { id: 'nicolas', nome: 'Nicolas', descricao: 'Ajudou na decoração e conhece os mecanismos.',                 acao: 'Testa uma pequena lanterna.',            anim: 'lanterna', prop: '🔦', pele: '#f3d0b0', cabelo: '#6e4b2a', estilo: 'cacheado', roupa: '#2e5d3a' },
-];
+  ['alice', 'pulo'],
+  ['bruno', 'balanco'],
+  ['cecilia', 'aceno'],
+  ['diego', 'passinho'],
+  ['eva', 'olhar'],
+  ['felipe', 'respira'],
+  ['isadora', 'gira'],
+  ['lucas', 'tremor'],
+  ['maya', 'flutua'],
+  ['nicolas', 'marcha'],
+].map(([id, animBoneco], i) => {
+  const n = String(i + 1).padStart(2, '0');
+  return {
+    id,
+    nome: `Personagem ${i + 1}`,
+    descricao: 'Nome e história ainda a definir.',
+    retrato: `assets/personagens/p${n}-retrato.jpg`,
+    boneco: `assets/personagens/p${n}-boneco.png`,
+    animBoneco,
+  };
+});
+
+// Nº 7: animação quadro a quadro mandando um beijo (folha com 6 poses de 320 × 500, ancoradas pelos pés).
+// quadros = [até que milissegundo, qual pose]; coracao = trajeto em pixels da pose.
+// Nº 3: dancinha em loop (6 poses de 284 × 470 tocadas na ordem 0,1,2,1,3,4,5,4 a 5 quadros/s).
+UC.PERSONAGENS.find((p) => p.id === 'cecilia').folha = {
+  imagem: 'assets/personagens/p03-danca.png',
+  total: 6,
+  proporcao: '284 / 470',
+  escala: 1,
+  seq: [0, 1, 2, 1, 3, 4, 5, 4],
+  fps: 5,
+};
+
+// Nº 4: abre a latinha, dá um gole e brinda (6 poses de 300 × 483, alinhadas pelos pés, a 5 quadros/s).
+UC.PERSONAGENS.find((p) => p.id === 'diego').folha = {
+  imagem: 'assets/personagens/p04-brinde.png',
+  total: 6,
+  proporcao: '300 / 483',
+  escala: 1,
+  seq: [0, 0, 1, 2, 2, 3, 4, 4, 4, 3, 5, 5, 5, 5],
+  fps: 5,
+};
+
+// Nº 10: tenta resolver o cubo mágico (6 poses de 260 × 478, alinhadas pelos pés, a 5 quadros/s).
+UC.PERSONAGENS.find((p) => p.id === 'nicolas').folha = {
+  imagem: 'assets/personagens/p10-cubo.png',
+  total: 6,
+  proporcao: '260 / 478',
+  escala: 1,
+  seq: [0, 0, 1, 2, 1, 2, 3, 4, 3, 4, 5, 5, 5, 0],
+  fps: 5,
+};
+
+// Nº 9: faz carinho no cachorro (6 poses de 478 × 436 com o cachorro ao lado, alinhadas pelos pés, a 5 quadros/s).
+UC.PERSONAGENS.find((p) => p.id === 'maya').folha = {
+  imagem: 'assets/personagens/p09-carinho.png',
+  total: 6,
+  proporcao: '478 / 436',
+  escala: .95,
+  seq: [0, 1, 2, 3, 2, 3, 4, 5, 5, 1],
+  fps: 5,
+};
+
+// Nº 8: treino com halteres e pose de força no final (8 poses de 242 × 424, a 5 quadros/s).
+UC.PERSONAGENS.find((p) => p.id === 'lucas').folha = {
+  imagem: 'assets/personagens/p08-pesos.png',
+  total: 8,
+  proporcao: '242 / 424',
+  escala: 1,
+  seq: [0, 0, 1, 2, 2, 3, 4, 1, 2, 2, 3, 4, 5, 5, 6, 7, 7, 7, 7, 6, 5, 0],
+  fps: 5,
+};
+
+// Nº 2: prepara um drink na mesinha e prova (8 poses de 344 × 396 com a mesa ao lado, a 5 quadros/s).
+UC.PERSONAGENS.find((p) => p.id === 'bruno').folha = {
+  imagem: 'assets/personagens/p02-drink.png',
+  total: 8,
+  proporcao: '344 / 396',
+  escala: 1,
+  seq: [0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 5, 5, 6, 6, 6, 7, 7, 7, 7],
+  fps: 5,
+};
+
+// Nº 1: tocando violão (6 poses de 348 × 496, a 5 quadros/s).
+UC.PERSONAGENS.find((p) => p.id === 'alice').folha = {
+  imagem: 'assets/personagens/p01-violao.png',
+  total: 6,
+  proporcao: '348 / 496',
+  escala: 1,
+  seq: [0, 1, 2, 3, 4, 5],
+  fps: 5,
+};
+
+// Nº 6: o frasco misterioso (6 poses de 335 × 474, alinhadas pelos pés, a 5 quadros/s).
+UC.PERSONAGENS.find((p) => p.id === 'felipe').folha = {
+  imagem: 'assets/personagens/p06-frasco.png',
+  total: 6,
+  proporcao: '335 / 474',
+  escala: 1,
+  seq: [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5],
+  fps: 5,
+};
+
+// Nº 5: coloca os fones e entra no ritmo da música (8 poses de 299 × 416, a 5 quadros/s).
+UC.PERSONAGENS.find((p) => p.id === 'eva').folha = {
+  imagem: 'assets/personagens/p05-fones.png',
+  total: 8,
+  proporcao: '299 / 416',
+  escala: 1,
+  seq: [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 6, 6, 7, 7, 5, 5],
+  fps: 5,
+};
+
+UC.PERSONAGENS.find((p) => p.id === 'isadora').folha = {
+  imagem: 'assets/personagens/p07-beijo.png',
+  total: 6,
+  // 5 quadros/s (200 ms cada): acena, mão na boca, pisca, beijo, mão aberta, volta e pausa
+  seq: [0, 1, 2, 2, 3, 4, 4, 5, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  fps: 5,
+  coracao: { de: 800, ate: 1800, x: 242, y: 185, dx: 50, dy: -110 },
+};
 
 // Duplas para partidas com menos de 10 pessoas (ordem do roteiro).
 // Com N jogadores, as primeiras (N - 5) duplas são desfeitas.

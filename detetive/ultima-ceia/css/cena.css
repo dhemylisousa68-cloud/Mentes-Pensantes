@@ -122,3 +122,11 @@ html.pausado .cena *, html.pausado .cena *::before, html.pausado .cena *::after 
 /* movimento reduzido: sem ciclo e sem tremor; a porta só aparece aberta */
 html.reduzido .cena *, html.reduzido .cena *::before, html.reduzido .cena *::after { animation: none !important; }
 html.reduzido .porta-folha, html.reduzido .penumbra, html.reduzido .porta-luz-piso { transition: none !important; }
+
+/* sala no escuro: a arte própria entra por cima e sai devagar (substitui penumbra e olhos feitos em código) */
+.cena-escura { inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .6s ease; user-select: none; }
+.cena.escura .cena-escura { opacity: 1; }
+/* o brilho dos olhos já está na arte; aqui ele só pulsa de leve */
+.cena.olhos .cena-escura { animation: pulsoEscura 1.6s ease-in-out infinite; }
+@keyframes pulsoEscura { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.12) saturate(1.1); } }
+.vela.apagada .sombra { opacity: 0; } /* a arte do escuro já escurece em volta */

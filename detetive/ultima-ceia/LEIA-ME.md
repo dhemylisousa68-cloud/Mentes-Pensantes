@@ -26,7 +26,6 @@
 
 ## Ciclo das velas (`UC.Velas`)
 
-A cada ~6 s (entre 5 e 7 s): uma a três velas enfraquecem → apagam (fumaça, penumbra) → os olhos do mascote
-brilham em vermelho → as velas reacendem com um clarão suave. Pausa durante a porta, com
-configurações ou formulários abertos, logo após cliques e com a aba oculta. Desligado com movimento
-reduzido.
+Só acontece enquanto o cursor (ou o foco do teclado) está sobre "Abrir a porta": as velas enfraquecem
+e apagam, a sala passa para a arte escura e os olhos do mascote brilham em vermelho. Ao tirar o cursor,
+tudo reacende com um clarão suave. No celular não há hover, então não escurece. Desligado com movimento reduzido.
