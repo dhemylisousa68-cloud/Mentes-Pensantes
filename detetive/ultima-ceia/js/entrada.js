@@ -97,7 +97,8 @@
     camera.style.transition = 'none';
     enquadrarPorta();
     veu.classList.add('ativo');
-    mostrarFormulario(destino);
+    if (destino === 'sala') UC.Sala.abrir(convite);
+    else mostrarFormulario(destino);
   }
 
   function voltar() {
@@ -145,11 +146,17 @@
         return;
       }
     }
-    try { localStorage.setItem('uc_nome', nome); } catch (err) { /* ignora */ }
+    const dados = f.codigo
+      ? { caso: 'ultima-ceia', acao: 'entrar', nome, codigo: f.codigo.value }
+      : { caso: 'ultima-ceia', acao: 'criar', nome, max: Number(f.max.value) };
+    try {
+      localStorage.setItem('uc_nome', nome);
+      sessionStorage.setItem('mp_sala', JSON.stringify(dados));
+    } catch (err) { /* ignora */ }
     UC.Som.clique();
-    aviso.className = 'aviso ok';
-    aviso.textContent = 'Tudo certo. A sala de espera será a próxima etapa do desenvolvimento.';
-    aviso.hidden = false;
+    convite = dados;
+    proxima.hidden = true;
+    UC.Sala.abrir(dados);
   }
   fCriar.addEventListener('submit', enviar);
   fEntrar.addEventListener('submit', enviar);
@@ -175,7 +182,24 @@
     if (e.key === 'Escape' && !pular.hidden) { e.preventDefault(); concluir(); }
   });
   $('#proxima .voltar').addEventListener('click', voltar);
-  window.addEventListener('resize', () => { if (!proxima.hidden) enquadrarPorta(); });
+  window.addEventListener('resize', () => { if (!proxima.hidden || !$('#sala').hidden) enquadrarPorta(); });
+
+  // Convite vindo do painel do Mentes Pensantes: a tela mostra "Abrir a porta"
+  let convite = null;
+  try {
+    const d = JSON.parse(sessionStorage.getItem('mp_sala') || 'null');
+    if (d && d.caso === 'ultima-ceia' && d.nome) convite = d;
+  } catch (e) { /* ignora */ }
+  if (convite) {
+    const saud = entrada.querySelector('.saudacao');
+    saud.textContent = convite.acao === 'entrar'
+      ? `${convite.nome}, seu convite para a sala ${convite.codigo} chegou.`
+      : `${convite.nome}, sua sala está pronta.`;
+    saud.hidden = false;
+    entrada.querySelector('[data-acao="sala"]').hidden = false;
+    entrada.querySelector('[data-acao="criar"]').hidden = true;
+    entrada.querySelector('[data-acao="entrar"]').hidden = true;
+  }
 
   // Vindo do "Entrar com código" do Mentes Pensantes: abre direto o formulário de código
   if (location.hash === '#entrar') {

@@ -11,38 +11,27 @@
 @property --m-adesivo { syntax: '<color>'; inherits: true; initial-value: #f6eedb; }
 
 .mascote {
-  --m-corpo: #12393c;
-  --m-corpo-claro: #2b6266;
-  --m-corpo-escuro: #07191b;
-  --m-contorno: #061112;
-  --m-creme: #f6eedb;
-  --m-olho: #f6eedb;
-  --m-lima: #c8f31c;
-  --m-roxo: #7b2fd6;
-  --m-roxo-escuro: #4a168f;
-  --m-vermelho: #cf2231;
-  --m-adesivo: #f6eedb;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  display: block;
+  --m-corpo: #12393c; --m-corpo-claro: #2b6266; --m-corpo-escuro: #07191b; --m-contorno: #061112;
+  --m-creme: #f6eedb; --m-olho: #f6eedb; --m-lima: #c8f31c; --m-roxo: #7b2fd6; --m-roxo-escuro: #4a168f;
+  --m-vermelho: #cf2231; --m-adesivo: #f6eedb;
+  --cab-r: 0deg; --cab-x: 0px; --cab-y: 0px;
+  width: 100%; height: 100%; overflow: visible; display: block;
   transition: --m-corpo .9s, --m-corpo-claro .9s, --m-corpo-escuro .9s, --m-contorno .9s, --m-creme .9s,
               --m-lima .9s, --m-roxo .9s, --m-roxo-escuro .9s, --m-vermelho .9s, --m-adesivo .9s;
 }
 .mascote.sem-transicao { transition: none !important; }
 
-/* Na sombra: só os olhos aparecem (intro) */
+/* Na sombra (intro): só os olhos aparecem */
 .mascote.sombra {
   --m-corpo: #050909; --m-corpo-claro: #050909; --m-corpo-escuro: #050909; --m-contorno: #020303;
   --m-creme: #0b0d0d; --m-lima: #0b0e06; --m-roxo: #08060c; --m-roxo-escuro: #08060c;
   --m-vermelho: #0c0505; --m-adesivo: #0a0c0c;
 }
-.mascote.sombra .olho .c-olho { filter: drop-shadow(0 0 8px rgba(246, 238, 219, .55)); }
+.mascote.sombra .camada-olho-esq, .mascote.sombra .camada-olho-dir { filter: drop-shadow(0 0 8px rgba(246, 238, 219, .55)); }
 .mascote.sombra .sombra-chao { opacity: 0; }
-
 .mascote .adesivo-cor { flood-color: var(--m-adesivo); }
 
-/* Cores */
+/* Cores do desenho provisório */
 .mascote .c-corpo { fill: var(--m-corpo); }
 .mascote .c-corpo-claro { fill: var(--m-corpo-claro); }
 .mascote .c-corpo-escuro { fill: var(--m-corpo-escuro); }
@@ -58,7 +47,6 @@
 .mascote .c-dourado { fill: #e8b53c; }
 .mascote .c-cinza { fill: #8d969c; }
 .mascote .c-convite { fill: #b3121f; }
-.mascote .c-lima-escuro-s { stroke: #7f9f0c; stroke-width: 4; stroke-linecap: round; fill: none; }
 .mascote .brilho-botao { fill: #f4ffc2; }
 .mascote .fivela { fill: none; stroke: #e8b53c; stroke-width: 11; }
 .mascote .cabo { fill: #6b3f1f; }
@@ -67,104 +55,94 @@
 .mascote .dobra { fill: none; stroke: #6e0a12; stroke-width: 4; stroke-linejoin: round; }
 .mascote .selo-anel { fill: none; stroke: #a87a1c; stroke-width: 3; }
 .mascote .selo-texto { font: 700 22px "Lilita One", sans-serif; fill: #7a5410; }
-
 .mascote .contorno { stroke: var(--m-contorno); stroke-width: 7; stroke-linejoin: round; }
 .mascote .contorno-fino { stroke: var(--m-contorno); stroke-width: 5; stroke-linejoin: round; }
 .mascote .contorno-olho { fill: none; stroke: var(--m-contorno); stroke-width: 6; stroke-linejoin: round; }
 .mascote .traco-creme { stroke: var(--m-creme); stroke-width: 5; stroke-linecap: round; fill: none; }
 .mascote .traco-contorno { stroke: var(--m-contorno); stroke-width: 3; stroke-linecap: round; fill: none; opacity: .5; }
+.mascote .traco-boca { fill: none; stroke: var(--m-creme); stroke-width: 10; stroke-linecap: round; }
 .mascote .dentes { stroke: var(--m-contorno); stroke-width: 3; opacity: .45; fill: none; }
 .mascote .vinco { stroke: var(--m-contorno); stroke-width: 5; stroke-linecap: round; fill: none; }
 .mascote .lupa { fill: none; stroke: var(--m-lima); stroke-width: 7; stroke-linecap: round; }
 .mascote .sombra-chao { fill: #000; opacity: .3; transition: opacity .9s; }
-
 .mascote .manga-contorno { fill: none; stroke: var(--m-contorno); stroke-width: 60; stroke-linecap: round; stroke-linejoin: round; }
 .mascote .manga { fill: none; stroke-width: 46; stroke-linecap: round; stroke-linejoin: round; }
 .mascote .c-corpo-s { stroke: var(--m-corpo); }
 .mascote .c-vermelho-s { stroke: var(--m-vermelho); }
-
 .mascote .pelo-borda circle { fill: var(--m-contorno); }
 .mascote .pelo-miolo circle { fill: var(--m-creme); }
 .mascote .pelo-sombra circle { fill: #d9cba9; opacity: .45; }
-
 .mascote .interrogacao-borda { fill: none; stroke: var(--m-contorno); stroke-width: 78; }
 .mascote .interrogacao { fill: none; stroke: var(--m-lima); stroke-width: 62; }
 .mascote .interrogacao-sombra { fill: none; stroke: #93b70f; stroke-width: 12; stroke-linecap: round; opacity: .7; }
 .mascote .interrogacao-brilho { fill: none; stroke: #f3ffbe; stroke-width: 12; stroke-linecap: round; opacity: .75; }
 
-/* Roupas */
-.mascote.roupa-detetive .so-natal { display: none; }
-.mascote.roupa-natal .so-detetive { display: none; }
+/* ---------- Camadas ---------- */
+.mascote .camada { opacity: 0; transition: opacity .14s ease; }
+.mascote .camada.visivel { opacity: 1; }
 
-/* Braço direito de Natal: poses */
-.mascote .br { opacity: 0; transition: opacity .16s ease; }
-.mascote.braco-faca .br-faca,
-.mascote.braco-atras .br-atras,
-.mascote.braco-shh .br-shh,
-.mascote.braco-convite .br-convite { opacity: 1; }
-.mascote .br-faca { transform-box: view-box; transform-origin: 472px 336px; transition: opacity .2s ease .25s, transform .45s cubic-bezier(.6, 0, .4, 1); }
-.mascote:not(.braco-faca) .br-faca { transform: rotate(120deg) translate(0, 40px); }
-.mascote.braco-faca .br-faca { transition: opacity .16s ease, transform .35s ease; }
-.mascote .br-convite .convite { transition: transform .3s ease; }
+/* Cabeça: gira em torno do pescoço; olhos e cabeça têm tempos diferentes */
+.mascote .gira-cabeca {
+  transform-box: view-box; transform-origin: 300px 330px;
+  transform: translate(var(--cab-x), var(--cab-y)) rotate(var(--cab-r));
+  transition: transform .5s cubic-bezier(.3, 1.25, .45, 1);
+}
+
+/* Braço com a faca: ao esconder, gira para trás das costas */
+.mascote .camada-braco-dir-faca { transform-box: view-box; transform-origin: 472px 336px; transition: opacity .18s ease .26s, transform .45s cubic-bezier(.6, 0, .35, 1); }
+.mascote .camada-braco-dir-faca:not(.visivel) { transform: rotate(125deg) translate(0, 30px); }
+.mascote .camada-braco-dir-faca.visivel { transition: opacity .12s ease, transform .35s ease; }
+.mascote .camada-braco-dir-atras { transition: opacity .2s ease .3s; }
+.mascote .camada-braco-dir-atras.visivel { transition-delay: .3s; }
+.mascote .camada-braco-dir-atras:not(.visivel) { transition-delay: 0s; }
+
+/* Braço oferecendo o convite: vem de trás das costas */
+.mascote .camada-braco-dir-convite, .mascote .camada-convite { transform-box: view-box; transform-origin: 472px 336px; transition: opacity .16s ease, transform .4s cubic-bezier(.3, 1.3, .5, 1); }
+.mascote .camada-braco-dir-convite:not(.visivel), .mascote .camada-convite:not(.visivel) { transform: rotate(-28deg) translate(30px, 10px); }
+
+/* Gorro puxado sobre o rosto e braços que puxam */
+.mascote .camada-gorro-cobrindo { transition: opacity .1s ease, transform .3s cubic-bezier(.5, 0, .5, 1.4); }
+.mascote .camada-gorro-cobrindo:not(.visivel) { transform: translateY(-70px); }
+.mascote .camada-bracos-puxando-gorro, .mascote .camada-bracos-puxando-gorro-natal { transition: opacity .12s ease, transform .3s cubic-bezier(.5, 0, .5, 1.4); }
+.mascote .camada-bracos-puxando-gorro:not(.visivel), .mascote .camada-bracos-puxando-gorro-natal:not(.visivel) { transform: translateY(-60px); }
+.mascote .camada-gorro { transition: opacity .12s ease, transform .35s cubic-bezier(.3, 1.4, .5, 1); }
+.mascote .camada-gorro:not(.visivel) { transform: translateY(70px) scale(.98); }
 
 /* Olhos */
 .mascote .olho { transform-box: fill-box; transform-origin: 50% 60%; transition: transform .22s ease; }
-.mascote .pupila { transition: transform .12s ease-out; }
+.mascote .pupila { transition: transform .1s ease-out; }
 .mascote .palpebra { transition: transform .09s ease-in-out; }
 .mascote.piscar .palpebra { transform: translateY(76px) !important; }
-.mascote.expr-piscadela .olho-d .palpebra,
-.mascote.expr-shh .olho-d .palpebra { transform: translateY(76px); transition-duration: .15s; }
+.mascote.expr-piscadela .olho-d .palpebra { transform: translateY(76px); transition-duration: .15s; }
 .mascote.expr-malicioso .palpebra { transform: translateY(12px); }
-.mascote.expr-inocente .olho { transform: scale(1.1, 1.18); }
+.mascote.expr-inocente .olho { transform: scale(1.08, 1.14); }
 .mascote.expr-inocente .palpebra { transform: translateY(-60px); }
+.mascote.expr-surpresa .olho { transform: scale(1.14, 1.22); }
+.mascote.expr-surpresa .palpebra { transform: translateY(-70px); }
 
 /* Sobrancelhas */
-.mascote .sobrancelha { transform-box: fill-box; transform-origin: 50% 50%; transition: transform .25s cubic-bezier(.3, 1.4, .5, 1); }
+.mascote .sobrancelha { transform-box: fill-box; transform-origin: 50% 50%; transition: transform .28s cubic-bezier(.3, 1.4, .5, 1); }
 .mascote.sobrancelha-erguida .sobrancelha-d { transform: translateY(-26px) rotate(10deg); }
 .mascote.expr-piscadela .sobrancelha-e { transform: translateY(-14px) rotate(-6deg); }
 .mascote.expr-piscadela .sobrancelha-d { transform: translateY(12px) rotate(8deg); }
 .mascote.expr-malicioso .sobrancelha-e { transform: translateY(6px) rotate(6deg); }
-.mascote.expr-malicioso .sobrancelha-d { transform: translateY(-22px) rotate(8deg); }
-.mascote.expr-inocente .sobrancelha-e { transform: translateY(-34px) rotate(-24deg); }
-.mascote.expr-inocente .sobrancelha-d { transform: translateY(-34px) rotate(26deg); }
-.mascote.expr-shh .sobrancelha-e { transform: translateY(-18px) rotate(-8deg); }
-.mascote.expr-shh .sobrancelha-d { transform: translateY(14px) rotate(6deg); }
+.mascote.expr-malicioso .sobrancelha-d { transform: translateY(-16px) rotate(6deg); }
+.mascote.expr-surpresa .sobrancelha-e { transform: translateY(-36px) rotate(-14deg); }
+.mascote.expr-surpresa .sobrancelha-d { transform: translateY(-36px) rotate(16deg); }
+.mascote.expr-inocente .sobrancelha-e { transform: translateY(-18px) rotate(-16deg); }
+.mascote.expr-inocente .sobrancelha-d { transform: translateY(-10px) rotate(6deg); }
+.mascote.expr-inocente.sobrancelha-erguida .sobrancelha-d { transform: translateY(-38px) rotate(14deg); }
 
-/* Bocas */
-.mascote .boca { opacity: 0; transition: opacity .15s; }
-.mascote .boca-sorriso, .mascote .boca-inocente { fill: none; stroke: var(--m-creme); stroke-width: 9; stroke-linecap: round; }
-.mascote.roupa-detetive.expr-piscadela .boca-sorriso,
-.mascote.roupa-detetive.expr-malicioso .boca-sorriso { opacity: 1; }
-.mascote.roupa-natal.expr-neutra .boca-risada,
-.mascote.roupa-natal.expr-malicioso .boca-risada,
-.mascote.roupa-natal.expr-sorriso .boca-risada,
-.mascote.roupa-natal.expr-piscadela .boca-risada { opacity: 1; }
-.mascote.expr-inocente .boca-inocente { opacity: 1; }
-.mascote.expr-shh .boca-shh { opacity: 1; }
+/* Respiração discreta e pequenos gestos */
+.mascote .balanco { transform-box: fill-box; transform-origin: 50% 100%; animation: respirar 3.8s ease-in-out infinite; }
+@keyframes respirar { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.01, .992); } }
+.mascote.encolher .balanco { animation: encolher .45s ease; }
+@keyframes encolher { 40% { transform: scale(1.03, .96); } }
 
-/* Respiração */
-.mascote .balanco { transform-box: fill-box; transform-origin: 50% 100%; animation: respirar 3.6s ease-in-out infinite; }
-@keyframes respirar { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, .99); } }
-.mascote.expr-malicioso .balanco { animation: malicia .5s ease-in-out 2; }
-@keyframes malicia { 50% { transform: translateY(-6px) rotate(-1deg); } }
-.mascote.expr-inocente .balanco { animation: inocente 1s ease-in-out; }
-@keyframes inocente { 40% { transform: rotate(-2deg) translateY(-4px); } }
-
-/* Brilho da piscadela */
+/* Brilho da piscadela (intro) */
 .mascote .brilho { fill: var(--m-lima); opacity: 0; transform-box: fill-box; transform-origin: 50% 50%; }
-.mascote.expr-piscadela .brilho, .mascote.expr-shh .brilho { animation: brilho .9s ease-out .1s both; }
+.mascote.expr-piscadela .brilho { animation: brilho .9s ease-out .1s both; }
 @keyframes brilho { 0% { opacity: 0; transform: scale(.2) rotate(0); } 30% { opacity: 1; transform: scale(1.2) rotate(30deg); } 100% { opacity: 0; transform: scale(.6) rotate(90deg); } }
 
-/* Fumaça */
-.mascote .fumaca circle { fill: #e9e4d8; opacity: 0; transform-box: fill-box; transform-origin: 50% 50%; }
-.mascote.fumacando .fumaca circle { animation: fumaca 1s ease-out both; }
-.mascote.fumacando .fumaca circle:nth-child(2n) { animation-delay: .05s; }
-.mascote.fumacando .fumaca circle:nth-child(3n) { animation-delay: .1s; }
-@keyframes fumaca {
-  0% { opacity: 0; transform: scale(.2); }
-  30% { opacity: .97; transform: scale(1); }
-  65% { opacity: .9; transform: scale(1.08); }
-  100% { opacity: 0; transform: scale(1.35) translateY(-20px); }
-}
-
 html.reduzido .mascote .balanco { animation: none !important; }
+html.reduzido .mascote .gira-cabeca { transition-duration: .001ms; }

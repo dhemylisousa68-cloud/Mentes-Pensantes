@@ -449,3 +449,42 @@ html.reduzido *, html.reduzido *::before, html.reduzido *::after { animation-dur
   .ps-selo { display: none; }
   .caso { min-height: 120px; }
 }
+
+/* ================= CENA DA SELEÇÃO ================= */
+#hub .quadro, #hub .lado-esq, #hub .icones-topo, #hub .casos-titulo, #hub .caso-breve { transition: filter .6s ease, opacity .6s ease; }
+#hub .casos { transition: background-color .6s ease; }
+#hub::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle at var(--cena-x, 72%) var(--cena-y, 55%), rgba(255, 196, 120, .16) 0, transparent 22%, rgba(2, 6, 6, .62) 58%);
+  transition: opacity .7s ease;
+}
+#hub.em-cena::after { opacity: 1; }
+#hub.em-cena .quadro { filter: brightness(.4) saturate(.6); }
+#hub.em-cena .lado-esq { opacity: .22; filter: grayscale(.5); }
+#hub.em-cena .icones-topo { opacity: .35; }
+#hub.em-cena .casos-titulo, #hub.em-cena .caso-breve { opacity: .25; }
+#hub.em-cena .casos { background-color: #b3a78c; }
+.palco::before {
+  content: ""; position: absolute; inset: -6% -14% -4%; z-index: -1; pointer-events: none; opacity: 0;
+  background: radial-gradient(closest-side at 62% 52%, rgba(255, 190, 110, .42), transparent);
+  transition: opacity .8s ease;
+}
+#hub.em-cena .palco::before { opacity: 1; }
+
+/* Balão junto ao rosto, com a ponta voltada para o mascote */
+.balao.perto-rosto {
+  position: fixed; right: auto; bottom: auto; transform: none; z-index: 45;
+  width: min(250px, 62vw); padding: .8rem 1rem;
+  animation: balaoRosto .3s cubic-bezier(.2, .9, .3, 1.3) both;
+}
+.balao.perto-rosto .balao-texto { margin: 0; font-size: 1.15rem; }
+.balao.perto-rosto::after { display: block; }
+.balao.perto-rosto.ponta-direita::after { right: -20px; left: auto; top: auto; bottom: 18px; transform: none; border: 12px solid transparent; border-left: 20px solid var(--tinta); }
+.balao.perto-rosto.ponta-baixo::after { right: auto; left: var(--ponta-x, 70%); top: 100%; bottom: auto; transform: translateX(-50%); border: 12px solid transparent; border-top: 18px solid var(--tinta); }
+@keyframes balaoRosto { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px) {
+  .balao.perto-rosto { bottom: auto; transform: none; box-shadow: 0 12px 30px rgba(0, 0, 0, .4); }
+  @keyframes balaoRosto { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
+}
+/* o mascote fica acima do escurecimento da cena */
+.mascote-hub { position: relative; z-index: 2; }

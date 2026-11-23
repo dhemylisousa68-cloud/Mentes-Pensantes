@@ -194,6 +194,22 @@ UC.Som = (() => {
     o.stop(t + 1.3); lfo.stop(t + 1.3);
   }
 
+  function erro() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    [0, 0.18].forEach((d, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'square';
+      o.frequency.setValueAtTime(i ? 196 : 247, t + d);
+      g.gain.setValueAtTime(0.0001, t + d);
+      g.gain.exponentialRampToValueAtTime(0.08, t + d + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.16);
+      o.connect(g); g.connect(efeitos);
+      o.start(t + d); o.stop(t + d + 0.2);
+    });
+  }
+
   function silenciarMusica(seg = 1.5) {
     if (!ctx) return;
     musica.gain.setTargetAtTime(0.0001, ctx.currentTime, seg / 3);
@@ -203,5 +219,5 @@ UC.Som = (() => {
 
   UC.Ajustes.aoMudar(aplicarVolumes);
 
-  return { iniciar, clique, rangido, silenciarMusica, retomarMusica, get ativo() { return iniciado; } };
+  return { iniciar, clique, rangido, erro, silenciarMusica, retomarMusica, get ativo() { return iniciado; } };
 })();

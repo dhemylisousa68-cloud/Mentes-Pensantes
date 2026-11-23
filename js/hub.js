@@ -122,12 +122,50 @@
   }
 
   function falar(html) {
+    balao.classList.remove('perto-rosto', 'ponta-direita', 'ponta-baixo');
+    balao.style.left = balao.style.top = '';
     balaoTexto.innerHTML = html;
     balaoAcoes.innerHTML = '';
     balao.hidden = false;
     balao.style.animation = 'none'; void balao.offsetWidth; balao.style.animation = '';
   }
   function calar() { balao.hidden = true; }
+
+  // Balão ao lado do rosto do mascote, com a ponta voltada para ele
+  function pontoNoMascote(x, y) {
+    const svg = mascote.elemento;
+    const p = svg.createSVGPoint();
+    p.x = x; p.y = y;
+    return p.matrixTransform(svg.getScreenCTM());
+  }
+  function falarPertoDoRosto(html) {
+    falar(html);
+    balao.classList.add('perto-rosto');
+    const rosto = pontoNoMascote(150, 300);
+    const b = { width: balao.offsetWidth, height: balao.offsetHeight };
+    let left = rosto.x - 24 - b.width;
+    let top = rosto.y - b.height * 0.85;
+    if (left >= 8) {
+      balao.classList.add('ponta-direita');
+    } else {
+      const topo = pontoNoMascote(300, 60);
+      left = Math.max(8, Math.min(innerWidth - b.width - 8, topo.x - b.width * 0.6));
+      top = topo.y - b.height - 14;
+      balao.classList.add('ponta-baixo');
+      balao.style.setProperty('--ponta-x', `${Math.max(20, Math.min(b.width - 20, rosto.x - left))}px`);
+    }
+    balao.style.left = `${left}px`;
+    balao.style.top = `${Math.max(8, top)}px`;
+  }
+
+  // Centro da luz quente da cena = posição do mascote
+  function posicionarCena() {
+    const r = caixaMascote.getBoundingClientRect();
+    const h = hub.getBoundingClientRect();
+    hub.style.setProperty('--cena-x', `${((r.left + r.width / 2 - h.left) / h.width) * 100}%`);
+    hub.style.setProperty('--cena-y', `${((r.top + r.height * 0.45 - h.top) / h.height) * 100}%`);
+  }
+  const estreito = () => matchMedia('(max-width: 760px)').matches;
 
   function travar(v) {
     ocupado = v;
@@ -178,10 +216,10 @@
   function iniciarOcioso() {
     clearInterval(ocioso);
     ocioso = setInterval(() => {
-      if (!mascote || painel.hidden) return;
+      if (!mascote || painel.hidden || ocupado) return;
       mascote.sobrancelha(true);
-      setTimeout(() => mascote.sobrancelha(false), 900);
-    }, 6500);
+      setTimeout(() => mascote.sobrancelha(false), 1100);
+    }, 8000);
   }
 
   // ----- Painel -----
@@ -226,9 +264,7 @@
     if (trocar) {
       selecionado = null;
       marcarCartao(null);
-      MP.Som.puf();
-      mascote.vestir('detetive');
-      mascote.expressao('neutra');
+      mascote.definir({ roupa: 'detetive', pose: 'detetive', gorro: 'nenhum', expressao: 'neutra' });
     }
     (lista.querySelector('.caso.selecionado') || lista.querySelector('.caso'))?.focus({ preventScroll: true });
   }
@@ -248,7 +284,7 @@
     Object.assign(voo.style, { left: alvo.left + 'px', top: alvo.top + 'px', width: alvo.width + 'px', height: alvo.height + 'px' });
     document.body.appendChild(voo);
     s.voo = voo;
-    mascote.braco('atras');
+    mascote.pose('atras');
     fundo.hidden = false;
     moverMascote(true, true);
     const anim = voo.animate([
@@ -280,35 +316,60 @@
     pularSeq.hidden = false;
     pularSeq.focus({ preventScroll: true });
 
+    const cartao = lista.querySelector(`[data-id="${caso.id}"]`);
+    if (estreito()) palco.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
     try {
-      // 0. troca de roupa com fumaça e sinos
-      MP.Som.sinos();
-      if (mascote.roupa !== caso.roupa) { MP.Som.puf(); mascote.vestir(caso.roupa); await passo(430); }
-      // 1. olha para o jogador e sorri maliciosamente
-      mascote.sobrancelha(false);
+      // 1. percebe o clique: os olhos vão ao cartão, a cabeça acompanha um instante depois
       mascote.livre = false;
-      mascote.olharDirecao(0, 0.15);
-      mascote.braco('faca');
-      mascote.expressao('malicioso');
-      await passo(800);
-      // 2. esconde a faca atrás das costas, falsa inocência
-      mascote.braco('atras');
-      mascote.expressao('inocente');
-      mascote.olharDirecao(-0.4, -0.7);
-      await passo(850);
-      // 3. "shhh" e piscadela, com a frase
-      mascote.braco('shh');
-      mascote.expressao('shh');
-      mascote.olharDirecao(0, 0.1);
-      MP.Som.shh();
-      falar('Você foi convidado. <strong>Álibi não incluso.</strong>');
-      await passo(1150);
-      // 4. apresenta o convite, que se amplia e vira o painel
-      calar();
-      mascote.braco('convite');
-      mascote.expressao('sorriso');
-      MP.Som.sinos(.45);
+      mascote.sobrancelha(false);
+      mascote.olharElemento(cartao, { atraso: 220 });
+      MP.Som.sinos(.35);
+      await passo(380);
+
+      // 2. o ambiente muda: fundo escurece e uma luz quente destaca o mascote e o caso
+      posicionarCena();
+      hub.classList.add('em-cena');
+      await passo(400);
+      mascote.olhar(0, 0.12, { atraso: 160 });
+      await passo(320);
+
+      // 3. puxa o gorro sobre o rosto e, ao levantar, aparece de Natal
+      if (mascote.estado.roupa !== caso.roupa) {
+        mascote.definir({ pose: 'puxando', gorro: 'cobrindo' });
+        await passo(420);
+        mascote.elemento.classList.add('encolher');
+        mascote.definir({ roupa: caso.roupa });
+        await passo(380);
+        mascote.elemento.classList.remove('encolher');
+      }
+      mascote.definir({ gorro: 'normal', pose: 'faca', expressao: 'malicioso' });
+      await passo(560);
+
+      // 4. percebe que está exibindo a faca: olha para ela, pausa e esconde atrás das costas
+      mascote.olhar(0.85, -0.9, { atraso: 230 });
+      mascote.expressao('surpresa');
+      await passo(650);
+      mascote.olhar(0, 0.1, { atraso: 170 });
+      await passo(180);
+      mascote.pose('atras');
       await passo(520);
+
+      // 5. finge inocência: sorriso, sobrancelha erguida e o balão junto ao rosto
+      mascote.expressao('inocente');
+      mascote.sobrancelha(true);
+      await passo(240);
+      falarPertoDoRosto('Você foi convidado. <strong>Álibi não incluso.</strong>');
+      await passo(600);
+      mascote.piscar();
+      await passo(700);
+
+      // 6. oferece o convite, que vira o painel
+      calar();
+      mascote.sobrancelha(false);
+      mascote.pose('convite');
+      MP.Som.sinos(.45);
+      await passo(560);
       await voarConvite(s);
       if (s.pulado) return;
       finalizar(caso, aba, 'surgindo');
@@ -330,9 +391,9 @@
     seq = null;
     pularSeq.hidden = true;
     calar();
-    mascote.vestir(caso.roupa, { fumaca: false });
-    mascote.braco('atras');
-    mascote.expressao('sorriso');
+    hub.classList.remove('em-cena');
+    mascote.elemento.classList.remove('encolher');
+    mascote.definir({ roupa: caso.roupa, pose: 'atras', gorro: 'normal', expressao: 'inocente' });
     mascote.sobrancelha(false);
     mascote.livre = true;
     if (!hub.classList.contains('painel-aberto')) moverMascote(true, modo !== 'suave');
@@ -388,7 +449,11 @@
       sessionStorage.setItem('mp_sala', JSON.stringify(dados));
     } catch (err) { /* ignora */ }
     MP.Som.sinos(.3);
-    avisar('Tudo certo! A sala de espera é a próxima etapa do desenvolvimento.');
+    marcarVista();
+    const caso = CASOS.find((c) => c.id === selecionado);
+    avisar('Tudo certo! Abrindo a porta…');
+    f.querySelector('button[type="submit"]').disabled = true;
+    setTimeout(() => { location.href = caso.caminho; }, reduzido() ? 0 : 500);
   }
   $('#ps-criar').addEventListener('submit', enviar);
   $('#ps-entrar').addEventListener('submit', enviar);

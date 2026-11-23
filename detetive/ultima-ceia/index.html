@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Cormorant+Garamond:ital,wght@1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/entrada.css">
+  <link rel="stylesheet" href="css/sala.css">
 </head>
 <body>
 
@@ -228,6 +229,8 @@
     </header>
 
     <nav class="menu" aria-label="Menu principal">
+      <p class="saudacao" hidden></p>
+      <button class="btn btn-principal" data-acao="sala" hidden>Abrir a porta</button>
       <button class="btn btn-principal" data-acao="criar">Criar uma sala</button>
       <button class="btn" data-acao="entrar">Entrar com código</button>
       <button class="btn btn-discreto" data-acao="config">Configurações</button>
@@ -296,7 +299,41 @@
     </form>
   </dialog>
 
+  <!-- Sala de espera (demonstração) -->
+  <section id="sala" class="sala" hidden aria-live="polite"></section>
+
+  <!-- Porta do salão ao iniciar a partida -->
+  <section id="porta-jogo" class="porta-jogo" hidden role="dialog" aria-modal="true" aria-labelledby="pj-titulo">
+    <svg class="pj-porta" viewBox="0 0 300 460" aria-hidden="true">
+      <defs>
+        <linearGradient id="pj-luz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe7bd"/><stop offset="1" stop-color="#c98a45"/></linearGradient>
+      </defs>
+      <rect x="0" y="0" width="300" height="460" rx="6" fill="#22140d"/>
+      <rect x="18" y="18" width="264" height="442" fill="url(#pj-luz)"/>
+      <g class="pj-folha">
+        <rect x="18" y="18" width="264" height="442" fill="#3a2418"/>
+        <g fill="#33201a" stroke="#1e120c" stroke-width="4">
+          <rect x="44" y="46" width="94" height="170"/><rect x="162" y="46" width="94" height="170"/>
+          <rect x="44" y="244" width="94" height="190"/><rect x="162" y="244" width="94" height="190"/>
+        </g>
+        <circle cx="150" cy="130" r="40" fill="none" stroke="#14301f" stroke-width="18"/>
+        <circle cx="150" cy="130" r="40" fill="none" stroke="#1f4a2c" stroke-width="7" stroke-dasharray="4 7"/>
+        <path d="M138 168 l12 -12 12 12 -12 6z" fill="#6e1622"/>
+        <circle cx="256" cy="262" r="9" fill="#c79a4a"/>
+      </g>
+      <rect class="pj-fresta" x="18" y="454" width="264" height="6" fill="#ffd08a"/>
+    </svg>
+    <div class="pj-erro" hidden>
+      <p class="pj-codigo">Erro · cenário não encontrado</p>
+      <h2 id="pj-titulo">O salão ainda está em construção</h2>
+      <p>A porta abriu, mas o cenário da Última Ceia ainda não foi montado. Essa é a próxima etapa do desenvolvimento.</p>
+      <button class="btn btn-principal pj-voltar" type="button">Voltar à sala de espera</button>
+    </div>
+  </section>
+
   <script src="../../js/ajustes.js"></script>
+  <script src="js/personagens.js"></script>
+  <script src="js/sala.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/entrada.js"></script>
 </body>
