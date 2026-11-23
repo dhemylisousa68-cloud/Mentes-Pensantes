@@ -48,7 +48,10 @@ MP.Rig = (() => {
       // pontas de onde o sangue pinga (no espaço do braço)
       gotas: [[64, 392], [98, 468]],
       // a cartinha, vinda da arte do envelope e encaixada na mesma mão
-      cartinha: { arte: 'envelope', escala: .646, pivoOrigem: [325, 640] },
+      // só mão + antebraço + envelope (sem o punho de pelo da outra arte, para não duplicar a manga)
+      cartinha: { arte: 'envelope', escala: .646, pivoOrigem: [325, 640], pontos: '94,456 217,406 300,389 341,467 350,533 317,578 328,604 314,618 292,612 250,622 217,600 194,600 156,556 100,489' },
+      // pedaço do punho de pelo que fica dentro da peça do braço: continua aparecendo quando a mão troca de objeto
+      punho: '224,408 254,418 258,490 194,492 192,450 224,447',
       pes: [320, 985],
       sombra: { cx: 320, cy: 975, rx: 215, ry: 22, desfoque: 9 },
       poses: {
@@ -123,7 +126,8 @@ MP.Rig = (() => {
     if (A.cartinha) {
       const B = ARTES[A.cartinha.arte], k = A.cartinha.escala, [ox, oy] = A.cartinha.pivoOrigem, [bx, by] = P.braco.pivo;
       gCartinha = el('g', { transform: `translate(${bx - ox * k} ${by - oy * k}) scale(${k})`, display: 'none' }, gBraco);
-      imagem(gCartinha, { 'clip-path': clip('braco-cartinha', 'polygon', { points: B.pecas.braco.pontos }) }, B.imagem, B.largura, B.altura);
+      imagem(gCartinha, { 'clip-path': clip('braco-cartinha', 'polygon', { points: A.cartinha.pontos }) }, B.imagem, B.largura, B.altura);
+      if (A.punho) imagem(gCartinha.parentNode, { 'clip-path': clip('punho', 'polygon', { points: A.punho }), class: 'rig-punho' }).setAttribute('display', 'none');
       cantosCartinha = B.envelope;
     }
     const imgCorpo = imagem(corpo, { mask: `url(#${id}-corpo)` });
@@ -165,7 +169,7 @@ MP.Rig = (() => {
         const corpoVar = imagem(null, { mask: `url(#${id}-var)`, opacity: 0 }, href);
         corpo.insertBefore(corpoVar, gCabeca);
         const cabecaVar = imagem(gCabeca, { 'clip-path': `url(#${id}-cabeca)`, opacity: 0 }, href);
-        variantes[nome] = { corpoVar, cabecaVar, op: mola(0, 110, 21) };
+        variantes[nome] = { corpoVar, cabecaVar, op: mola(0, 110, 21), opCab: mola(0, 110, 21) };
       }
     }
     if (O) {
@@ -210,6 +214,7 @@ MP.Rig = (() => {
       segurando = qual;
       imgFaca.setAttribute('display', qual === 'faca' ? 'inline' : 'none');
       gCartinha.setAttribute('display', qual === 'cartinha' ? 'inline' : 'none');
+      svg.querySelector('.rig-punho')?.setAttribute('display', qual === 'cartinha' ? 'inline' : 'none');
     }
 
     function aplicar() {
@@ -230,7 +235,7 @@ MP.Rig = (() => {
         const vv = limitar(variantes[nome].op.v, 0, 1);
         maxVar = Math.max(maxVar, vv);
         variantes[nome].corpoVar.setAttribute('opacity', vv.toFixed(3));
-        variantes[nome].cabecaVar.setAttribute('opacity', vv.toFixed(3));
+        variantes[nome].cabecaVar.setAttribute('opacity', limitar(variantes[nome].opCab.v, 0, 1).toFixed(3));
       }
       const base = (1 - maxVar * maxVar).toFixed(3);
       imgCorpo.setAttribute('opacity', base);
@@ -238,7 +243,7 @@ MP.Rig = (() => {
     }
     function variantePrincipal() {
       let melhor = null, v = .5;
-      for (const nome in variantes) if (variantes[nome].op.v > v) { v = variantes[nome].op.v; melhor = nome; }
+      for (const nome in variantes) if (variantes[nome].opCab.v > v) { v = variantes[nome].opCab.v; melhor = nome; }
       return melhor;
     }
 
@@ -304,7 +309,13 @@ MP.Rig = (() => {
       ossos.inclina.alvo = inclinaPose + ocioso * (.35 * Math.sin(t * 2 * Math.PI / 7.9) + .5 * Math.sin(t * 2 * Math.PI / 13.1));
       ossos.rubor.alvo = envergonhado ? 1 : 0;
       // a pose alternativa só entra com o braço já escondido atrás do corpo
-      for (const k in variantes) variantes[k].op.alvo = (k === varianteDesejada && (atras || calmo)) ? 1 : 0;
+      // com a mão escondida, o corpo usa a pose desenhada com as mãos para trás (sem toco no punho);
+      // o rosto só muda quando uma variante é pedida de propósito
+      const corpoDesejado = varianteDesejada || (querAtras && A.variantes?.assobio ? 'assobio' : null);
+      for (const k in variantes) {
+        variantes[k].op.alvo = (k === corpoDesejado && (atras || calmo)) ? 1 : 0;
+        variantes[k].opCab.alvo = (k === varianteDesejada && (atras || calmo)) ? 1 : 0;
+      }
 
       // piscar em intervalos variados (às vezes duas vezes seguidas)
       let palpebraBase = envergonhado ? 1.45 : 1;
@@ -321,11 +332,11 @@ MP.Rig = (() => {
 
       if (calmo) {
         for (const k in ossos) { ossos[k].v = ossos[k].alvo; ossos[k].vel = 0; }
-        for (const k in variantes) { const m = variantes[k].op; m.v = m.alvo; m.vel = 0; }
+        for (const k in variantes) for (const m of [variantes[k].op, variantes[k].opCab]) { m.v = m.alvo; m.vel = 0; }
         pendulo.a = 0; pendulo.vel = 0;
       } else {
         for (const k in ossos) passoMola(ossos[k], dt);
-        for (const k in variantes) passoMola(variantes[k].op, dt);
+        for (const k in variantes) { passoMola(variantes[k].op, dt); passoMola(variantes[k].opCab, dt); }
         const velCabeca = (ossos.cabeca.v - ultimaCabeca) / Math.max(dt, 1e-3);
         const acelCabeca = (velCabeca - velCabecaAnt) / Math.max(dt, 1e-3);
         ultimaCabeca = ossos.cabeca.v; velCabecaAnt = velCabeca;
