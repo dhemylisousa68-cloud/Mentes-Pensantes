@@ -190,3 +190,9 @@
 /* o palco acompanha bonecos mais largos (ex.: com o cachorro) */
 .palco-boneco { width: auto; min-width: 112px; }
 @media (max-width: 760px) { .palco-boneco { min-width: 90px; } }
+
+/* aviso de conexão / erro da sala online */
+.sala-aviso { max-width: 520px; text-align: center; align-items: center; }
+.sala-aviso p { margin: 0; color: var(--texto); }
+.sala-aviso .sala-sair { align-self: center; }
+.sala-demo strong { color: var(--ouro-claro); letter-spacing: .12em; }

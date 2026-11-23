@@ -1,7 +1,6 @@
-// Sala de espera da Última Ceia: VERSÃO DE DEMONSTRAÇÃO, sem servidor.
-// Os personagens aparecem como bolas coloridas até a arte deles ser definida.
-// Os outros jogadores são simulados ("jogadores de teste"). Quando o Supabase entrar,
-// esta tela passa a mostrar os jogadores reais da sala.
+// Sala de espera da Última Ceia.
+// ONLINE (padrão): salas e jogadores reais no Supabase, atualizados em tempo real (js/online.js).
+// DEMONSTRAÇÃO: se o Supabase não carregar, a sala funciona só neste navegador com jogadores simulados.
 window.UC = window.UC || {};
 
 UC.Sala = (() => {
@@ -23,7 +22,92 @@ UC.Sala = (() => {
     return c;
   }
 
-  function salvar() { try { sessionStorage.setItem(CHAVE, JSON.stringify(st)); } catch (e) { /* ignora */ } }
+  let online = false;
+  let meuConvite = null;
+  function salvar() { if (online) return; try { sessionStorage.setItem(CHAVE, JSON.stringify(st)); } catch (e) { /* ignora */ } }
+
+  // ---------- modo online ----------
+  function aviso(texto, erro) {
+    raiz.innerHTML = `<div class="sala-painel sala-aviso">
+      <p class="sala-rotulo">A Última Ceia · Sala de espera</p>
+      <h2>${erro ? 'Não foi possível entrar' : 'Abrindo a sala…'}</h2>
+      <p>${esc(texto)}</p>
+      ${erro ? '<div class="sala-acoes"><button class="btn btn-principal tentar" type="button">Tentar de novo</button></div>' : ''}
+      <a class="sala-sair" href="../../">‹ Voltar ao Mentes Pensantes</a>
+    </div>`;
+  }
+
+  let atualizando = false, deNovo = false, agendado = 0;
+  const intervalos = [];
+  function agendarAtualizar() { clearTimeout(agendado); agendado = setTimeout(atualizar, 150); }
+
+  async function atualizar() {
+    if (!online || !st) return;
+    if (atualizando) { deNovo = true; return; }
+    atualizando = true;
+    try {
+      const { sala, jogadores } = await UC.Online.estado(st.codigo);
+      const eu = UC.Online.usuario;
+      if (!sala || !jogadores.some((j) => j.usuario === eu)) {
+        // caiu da sala (aba parada por muito tempo): tenta voltar sozinho
+        await UC.Online.rpc('entrar_sala', { p_codigo: st.codigo, p_nome: meuConvite.nome });
+        deNovo = true;
+        return;
+      }
+      st.max = sala.max;
+      st.souAnfitriao = sala.anfitriao === eu;
+      st.jogadores = jogadores.map((j) => ({
+        id: j.usuario, nome: j.nome, voce: j.usuario === eu, anfitriao: j.usuario === sala.anfitriao,
+        personagem: j.personagem, unidade: j.unidade, pronto: j.pronto, teste: j.teste,
+      }));
+      render();
+    } catch (e) {
+      const t = String(e && e.message || e);
+      if (t.includes('SALA_NAO_EXISTE') || t.includes('SALA_CHEIA')) aviso(UC.Online.mensagem(e), true);
+      // falha de rede: tenta de novo no próximo ciclo
+    } finally {
+      atualizando = false;
+      if (deNovo) { deNovo = false; agendarAtualizar(); }
+    }
+  }
+
+  async function abrirOnline(convite) {
+    online = true;
+    meuConvite = convite;
+    aviso('Conectando…');
+    try {
+      await UC.Online.conectar();
+      let codigo = convite.codigo;
+      if (convite.acao !== 'entrar' && codigo) {
+        // anfitrião recarregou a página: volta para a mesma sala (ou cria outra se ela acabou)
+        try { await UC.Online.rpc('entrar_sala', { p_codigo: codigo, p_nome: convite.nome }); }
+        catch (e) { if (String(e.message).includes('SALA_NAO_EXISTE')) codigo = null; else throw e; }
+      }
+      if (convite.acao !== 'entrar' && !codigo) {
+        codigo = await UC.Online.rpc('criar_sala', { p_nome: convite.nome, p_max: Number(convite.max) || 10 });
+        convite.codigo = codigo;
+        try { sessionStorage.setItem('mp_sala', JSON.stringify(convite)); } catch (e) { /* ignora */ }
+      } else if (convite.acao === 'entrar') {
+        codigo = await UC.Online.rpc('entrar_sala', { p_codigo: codigo, p_nome: convite.nome });
+      }
+      st = { online: true, codigo, max: Number(convite.max) || 10, souAnfitriao: false, jogadores: [] };
+      await atualizar();
+      if (!st.jogadores.length) return;
+      UC.Online.ouvir(codigo, agendarAtualizar);
+      intervalos.forEach(clearInterval);
+      intervalos.push(setInterval(() => UC.Online.rpc('estou_aqui', { p_codigo: st.codigo }).catch(() => {}), 20000));
+      intervalos.push(setInterval(atualizar, 6000)); // reserva, caso o tempo real falhe
+      raiz.querySelector('.bola')?.focus({ preventScroll: true });
+    } catch (e) {
+      aviso(UC.Online.mensagem(e), true);
+    }
+  }
+
+  async function acaoOnline(nome, args) {
+    try { await UC.Online.rpc(nome, { p_codigo: st.codigo, ...args }); }
+    catch (e) { dica(UC.Online.mensagem(e)); }
+    agendarAtualizar();
+  }
 
   function novoEstado(convite) {
     const criar = convite.acao !== 'entrar';
@@ -77,6 +161,7 @@ UC.Sala = (() => {
     salvar();
     render();
     raiz.querySelector(`.bola[data-id="${id}"]`)?.classList.add('pulo');
+    if (online) acaoOnline('escolher_personagem', { p_personagem: id });
   }
 
   function alternarPronto() {
@@ -86,9 +171,11 @@ UC.Sala = (() => {
     som('clique');
     salvar();
     render();
+    if (online) acaoOnline('marcar_pronto', { p_pronto: j.pronto });
   }
 
   function adicionarTeste() {
+    if (online) { som('clique'); acaoOnline('adicionar_teste', {}); return; }
     if (st.jogadores.length >= st.max) { dica('A sala está cheia.'); return; }
     const nome = NOMES_TESTE[st.proximoTeste % NOMES_TESTE.length] + (st.proximoTeste >= NOMES_TESTE.length ? ' ' + (Math.floor(st.proximoTeste / NOMES_TESTE.length) + 1) : '');
     const t = { id: 't' + (++st.proximoTeste), nome, teste: true, personagem: null, unidade: null, pronto: false };
@@ -107,6 +194,7 @@ UC.Sala = (() => {
   }
 
   function removerTestes() {
+    if (online) { som('clique'); acaoOnline('remover_testes', {}); return; }
     st.jogadores = st.jogadores.filter((j) => !j.teste);
     som('clique');
     salvar();
@@ -228,6 +316,7 @@ UC.Sala = (() => {
     let dicaTexto;
     if (!j.personagem) dicaTexto = 'Toque em uma foto para escolher seu personagem.';
     else if (!j.pronto) dicaTexto = 'Quando estiver pronto, marque "Estou pronto".';
+    else if (!cheia && online) dicaTexto = `Faltam ${st.max - st.jogadores.length} jogador(es). Mande o código ${st.codigo} para eles${st.souAnfitriao ? ' ou use "Adicionar jogador de teste"' : ''}.`;
     else if (!cheia) dicaTexto = `Faltam ${st.max - st.jogadores.length} jogador(es). Use "Adicionar jogador de teste" para simular.`;
     else if (!todosProntos) dicaTexto = 'Aguardando todos ficarem prontos.';
     else dicaTexto = 'Todos prontos! A porta vai se abrir…';
@@ -247,7 +336,9 @@ UC.Sala = (() => {
             <button class="btn btn-discreto copiar" type="button">Copiar</button>
           </div>
         </header>
-        <p class="sala-demo">Versão de demonstração: ainda sem servidor. Os outros jogadores são simulados. Toque numa foto para ver o boneco que vai para o jogo.</p>
+        <p class="sala-demo">${online
+          ? `Sala online: mande o código <strong>${esc(st.codigo)}</strong> para os outros jogadores. Eles entram pelo Mentes Pensantes em "Entrar com código". Toque numa foto para ver o boneco que vai para o jogo.`
+          : 'Versão de demonstração: sem conexão com o servidor. Os outros jogadores são simulados. Toque numa foto para ver o boneco que vai para o jogo.'}</p>
 
         <div class="sala-corpo">
           <section class="sala-bolas" aria-label="Personagens">${bolas}</section>
@@ -268,8 +359,8 @@ UC.Sala = (() => {
 
             <div class="sala-acoes">
               <button class="btn ${j.pronto ? '' : 'btn-principal'} pronto" type="button" ${meu ? '' : 'disabled'}>${j.pronto ? 'Não estou pronto' : 'Estou pronto'}</button>
-              <button class="btn testar" type="button" ${cheia ? 'disabled' : ''}>Adicionar jogador de teste</button>
-              ${st.jogadores.some((x) => x.teste) ? '<button class="btn btn-discreto limpar" type="button">Remover jogadores de teste</button>' : ''}
+              ${!online || st.souAnfitriao ? `<button class="btn testar" type="button" ${cheia ? 'disabled' : ''}>Adicionar jogador de teste</button>` : ''}
+              ${(!online || st.souAnfitriao) && st.jogadores.some((x) => x.teste) ? '<button class="btn btn-discreto limpar" type="button">Remover jogadores de teste</button>' : ''}
             </div>
             <p class="sala-dica" role="status">${esc(dicaTexto)}</p>
             ${parceiroMeu ? `<p class="sala-par">Você joga com ${esc(meu.nome)} e também recebe as cartas de ${esc(UC.porId(parceiroMeu).nome)}.</p>` : ''}
@@ -288,6 +379,8 @@ UC.Sala = (() => {
   // ---------- abrir ----------
   function abrir(convite) {
     raiz = $('#sala');
+    if (st && st.online) { raiz.hidden = false; render(); return; } // já conectado
+    if (UC.Online && UC.Online.disponivel()) { raiz.hidden = false; abrirOnline(convite); return; }
     st = carregar(convite);
     salvar();
     raiz.hidden = false;
@@ -297,6 +390,16 @@ UC.Sala = (() => {
 
   document.addEventListener('click', (e) => {
     if (!raiz || raiz.hidden) return;
+    if (e.target.closest('#sala .tentar')) { location.reload(); return; }
+    // sair de verdade: libera a vaga e o personagem para os outros
+    const sair = e.target.closest('#sala .sala-sair');
+    if (sair && online && st && st.codigo) {
+      e.preventDefault();
+      try { sessionStorage.removeItem('mp_sala'); } catch (err) { /* ignora */ }
+      UC.Online.rpc('sair_sala', { p_codigo: st.codigo }).catch(() => {}).finally(() => { location.href = sair.href; });
+      return;
+    }
+    if (!st) return;
     const b = e.target.closest('.bola');
     if (b && raiz.contains(b)) { escolher(b.dataset.id); return; }
     if (e.target.closest('#sala .pronto')) alternarPronto();
