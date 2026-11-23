@@ -217,7 +217,39 @@ UC.Som = (() => {
 
   function retomarMusica() { aplicarVolumes(); }
 
+  // ---------- ciclo das velas ----------
+  // sopro curto quando a chama apaga
+  function sopro() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const s = ctx.createBufferSource(); s.buffer = ruido(.6);
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(1400, t); f.frequency.exponentialRampToValueAtTime(500, t + .5); f.Q.value = .8;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(.09, t + .05); g.gain.exponentialRampToValueAtTime(0.0001, t + .55);
+    s.connect(f); f.connect(g); g.connect(efeitos); s.start(t); s.stop(t + .6);
+  }
+  // grave contido enquanto os olhos brilham (sem susto: entra e sai devagar)
+  function sussurro() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    silenciarMusica(1.2);
+    [41, 41.3].forEach((m) => {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = hz(m);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(.08, t + .8); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
+      o.connect(g); g.connect(efeitos); g.connect(reverb); o.start(t); o.stop(t + 2.7);
+    });
+    setTimeout(retomarMusica, 2600);
+  }
+  // fósforo/estalo suave ao reacender
+  function acender() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const s = ctx.createBufferSource(); s.buffer = ruido(.4);
+    const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2500;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(.06, t + .02); g.gain.exponentialRampToValueAtTime(0.0001, t + .35);
+    s.connect(f); f.connect(g); g.connect(efeitos); s.start(t); s.stop(t + .4);
+  }
+
   UC.Ajustes.aoMudar(aplicarVolumes);
 
-  return { iniciar, clique, rangido, erro, silenciarMusica, retomarMusica, get ativo() { return iniciado; } };
+  return { iniciar, clique, rangido, erro, silenciarMusica, retomarMusica, sopro, sussurro, acender, get ativo() { return iniciado; } };
 })();

@@ -29,53 +29,6 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ---------- Cenário ---------- */
-#camera {
-  position: fixed;
-  inset: 0;
-  will-change: transform;
-}
-#cena { width: 100%; height: 100%; display: block; overflow: visible; }
-
-.chuva { animation: chuva .55s linear infinite; }
-.chuva-lenta { animation-duration: .9s; }
-@keyframes chuva { from { transform: translateY(0); } to { transform: translateY(140px); } }
-
-.luzes circle {
-  animation: piscar 3.2s ease-in-out infinite;
-  animation-delay: var(--d, 0s);
-}
-@keyframes piscar { 0%, 100% { opacity: .95; } 50% { opacity: .35; } }
-
-.chama {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: chama 1.6s ease-in-out infinite;
-  animation-delay: var(--d, 0s);
-}
-.vela circle { animation: halo 2.4s ease-in-out infinite; animation-delay: var(--d, 0s); }
-@keyframes chama { 0%,100% { transform: scale(1, 1) rotate(0deg); } 30% { transform: scale(.9, 1.08) rotate(-3deg); } 60% { transform: scale(1.05, .94) rotate(2deg); } }
-@keyframes halo { 0%,100% { opacity: 1; } 50% { opacity: .75; } }
-
-.poeira circle { animation: poeira 9s ease-in-out infinite; animation-delay: var(--d, 0s); opacity: 0; }
-@keyframes poeira {
-  0% { transform: translate(0, 0); opacity: 0; }
-  30% { opacity: .7; }
-  100% { transform: translate(14px, 60px); opacity: 0; }
-}
-
-.cone { animation: cone 7s ease-in-out infinite; }
-@keyframes cone { 0%,100% { opacity: 1; } 50% { opacity: .8; } }
-
-.fresta { animation: halo 4s ease-in-out infinite; }
-
-#porta-folha {
-  transform-box: fill-box;
-  transform-origin: 0% 50%;
-  transition: transform 1s cubic-bezier(.5, 0, .3, 1);
-}
-#porta.aberta #porta-folha { transform: scaleX(.12) skewY(-6deg); }
-
 #veu {
   position: fixed;
   inset: 0;
@@ -286,8 +239,8 @@ fieldset legend { margin-bottom: .5rem; padding: 0; }
 html.reduzido *, html.reduzido *::before, html.reduzido *::after {
   animation: none !important;
 }
-html.reduzido .poeira circle { opacity: 0; }
-html.reduzido #camera, html.reduzido #porta-folha { transition: none !important; }
+
+html.reduzido .cena { transition: none !important; }
 
 @media (max-width: 600px) {
   .menu { width: 100%; max-width: 360px; }

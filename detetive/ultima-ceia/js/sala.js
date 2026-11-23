@@ -133,11 +133,28 @@ UC.Sala = (() => {
     return `<span class="bola-esfera ${tamanho}" style="--cor:${CORES_BOLA[p.id] || p.roupa}"><span>${esc(p.nome[0])}</span></span>`;
   }
 
+  // Momento 2 da porta: todos logados, com personagem escolhido e prontos.
+  // Dispara uma vez por vez que a sala fica completa (se alguém desmarcar, pode disparar de novo).
+  let avisoTimer = 0;
+  function avisarTodosProntos(completo) {
+    if (completo && !st.portaAberta) {
+      st.portaAberta = true;
+      salvar();
+      clearTimeout(avisoTimer);
+      avisoTimer = setTimeout(() => UC.Entrada?.todosProntos(), 1200);
+    } else if (!completo && st.portaAberta) {
+      st.portaAberta = false;
+      clearTimeout(avisoTimer);
+      salvar();
+    }
+  }
+
   function render() {
     const j = eu();
     const meu = j.personagem && UC.porId(j.personagem);
     const parceiroMeu = j.personagem && UC.parceiroDe(j.personagem, st.max);
     const todosProntos = st.jogadores.every((x) => x.pronto);
+    avisarTodosProntos(st.jogadores.length === st.max && st.jogadores.every((x) => x.pronto && x.personagem));
     const cheia = st.jogadores.length === st.max;
     const foco = UC.porId(detalhe || j.personagem || 'alice');
     const focoParceiro = UC.parceiroDe(foco.id, st.max);
@@ -171,7 +188,7 @@ UC.Sala = (() => {
     else if (!j.pronto) dicaTexto = 'Quando estiver pronto, marque "Estou pronto".';
     else if (!cheia) dicaTexto = `Faltam ${st.max - st.jogadores.length} jogador(es). Use "Adicionar jogador de teste" para simular.`;
     else if (!todosProntos) dicaTexto = 'Aguardando todos ficarem prontos.';
-    else dicaTexto = st.souAnfitriao ? 'Todos prontos! Você pode começar.' : 'Todos prontos! Aguardando o anfitrião.';
+    else dicaTexto = 'Todos prontos! A porta vai se abrir…';
 
     raiz.innerHTML = `
       <div class="sala-painel">
@@ -209,9 +226,6 @@ UC.Sala = (() => {
               <button class="btn ${j.pronto ? '' : 'btn-principal'} pronto" type="button" ${meu ? '' : 'disabled'}>${j.pronto ? 'Não estou pronto' : 'Estou pronto'}</button>
               <button class="btn testar" type="button" ${cheia ? 'disabled' : ''}>Adicionar jogador de teste</button>
               ${st.jogadores.some((x) => x.teste) ? '<button class="btn btn-discreto limpar" type="button">Remover jogadores de teste</button>' : ''}
-              ${st.souAnfitriao
-                ? `<button class="btn btn-jogar jogar" type="button" ${meu ? '' : 'disabled'}>Jogar</button>`
-                : `<button class="btn btn-jogar jogar" type="button" ${meu ? '' : 'disabled'}>Simular início do anfitrião</button>`}
             </div>
             <p class="sala-dica" role="status">${esc(dicaTexto)}</p>
             ${parceiroMeu ? `<p class="sala-par">Você joga com ${esc(meu.nome)} e também recebe as cartas de ${esc(UC.porId(parceiroMeu).nome)}.</p>` : ''}
@@ -220,28 +234,6 @@ UC.Sala = (() => {
 
         <a class="sala-sair" href="../../">‹ Sair para o Mentes Pensantes</a>
       </div>`;
-  }
-
-  // ---------- porta do salão (Jogar) ----------
-  function abrirPortaJogo() {
-    const pj = $('#porta-jogo');
-    const erro = $('.pj-erro', pj);
-    pj.classList.remove('aberta');
-    erro.hidden = true;
-    pj.hidden = false;
-    som('clique');
-    const reduzido = UC.Ajustes.get('reduzido');
-    setTimeout(() => { pj.classList.add('aberta'); som('rangido'); }, reduzido ? 0 : 700);
-    setTimeout(() => {
-      erro.hidden = false;
-      som('erro');
-      $('.pj-voltar', pj).focus();
-    }, reduzido ? 100 : 1900);
-  }
-  function fecharPortaJogo() {
-    som('clique');
-    $('#porta-jogo').hidden = true;
-    raiz.querySelector('.jogar')?.focus();
   }
 
   // ---------- abrir ----------
@@ -261,13 +253,9 @@ UC.Sala = (() => {
     if (e.target.closest('#sala .pronto')) alternarPronto();
     else if (e.target.closest('#sala .testar')) adicionarTeste();
     else if (e.target.closest('#sala .limpar')) removerTestes();
-    else if (e.target.closest('#sala .jogar')) abrirPortaJogo();
     else if (e.target.closest('#sala .copiar')) {
       navigator.clipboard?.writeText(st.codigo).then(() => dica('Código copiado.'), () => dica(`Código: ${st.codigo}`));
-    } else if (e.target.closest('.pj-voltar')) fecharPortaJogo();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !$('#porta-jogo').hidden) fecharPortaJogo();
+    }
   });
 
   return { abrir };

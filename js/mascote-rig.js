@@ -335,7 +335,9 @@ MP.Rig = (() => {
         for (const k in variantes) for (const m of [variantes[k].op, variantes[k].opCab]) { m.v = m.alvo; m.vel = 0; }
         pendulo.a = 0; pendulo.vel = 0;
       } else {
-        for (const k in ossos) passoMola(ossos[k], dt);
+        // molas rígidas (pálpebra) ficam instáveis com quadros longos: avança em passos curtos
+        const passos = Math.max(1, Math.ceil(dt / (1 / 240)));
+        for (let i = 0; i < passos; i++) for (const k in ossos) passoMola(ossos[k], dt / passos);
         for (const k in variantes) { passoMola(variantes[k].op, dt); passoMola(variantes[k].opCab, dt); }
         const velCabeca = (ossos.cabeca.v - ultimaCabeca) / Math.max(dt, 1e-3);
         const acelCabeca = (velCabeca - velCabecaAnt) / Math.max(dt, 1e-3);

@@ -1,14 +1,20 @@
-// Tela de entrada: menu, configurações, ativação do som e câmera até a porta.
+// Tela de entrada: menu, configurações, ativação do som e a porta da sala.
+//
+// Fluxo da porta:
+//   1. "Abrir a porta" (ou Criar / Entrar): a câmera vai até a porta, ela abre e o jogador segue para a
+//      escolha de personagem (ou para o formulário). Só abre com o clique, nunca com hover.
+//   2. Quando todos os jogadores estão na sala com personagem escolhido e prontos, a sala chama
+//      UC.Entrada.todosProntos(): a porta abre de novo e leva adiante.
 (() => {
   const $ = (s) => document.querySelector(s);
-  const camera = $('#camera');
-  const porta = $('#porta');
   const veu = $('#veu');
   const entrada = $('#entrada');
   const pular = $('#pular');
   const proxima = $('#proxima');
   const dicaSom = $('#dica-som');
   const dialogo = $('#config');
+  const reduzido = () => UC.Ajustes.get('reduzido');
+  const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // ---------- Som só após a primeira interação ----------
   function ativarSom() {
@@ -20,7 +26,7 @@
   window.addEventListener('pointerdown', ativarSom);
   window.addEventListener('keydown', ativarSom);
 
-  // ---------- Configurações ----------
+  // ---------- Configurações (pausam o ciclo das velas) ----------
   const formCfg = dialogo.querySelector('form');
   function preencherConfig() {
     const v = UC.Ajustes.todos();
@@ -45,58 +51,50 @@
   ['p', 'm', 'g'].forEach((v, i) => {
     formCfg.querySelectorAll('input[name="texto"]')[i].setAttribute('aria-label', ['Texto pequeno', 'Texto médio', 'Texto grande'][i]);
   });
+  dialogo.addEventListener('close', () => UC.Velas.retomar());
 
-  // ---------- Câmera até a porta ----------
-  let timers = [];
+  // ---------- Momento 1: abrir a porta para a escolha ----------
   let destino = null;
-  const esperar = (ms, fn) => timers.push(setTimeout(fn, ms));
+  let passagem = null; // sequência em andamento (pode ser pulada)
 
-  function enquadrarPorta() {
-    // mede a porta com a câmera na posição original
-    const transicao = camera.style.transition;
-    camera.style.transition = 'none';
-    camera.style.transform = 'none';
-    const r = $('#porta-moldura').getBoundingClientRect();
-    camera.getBoundingClientRect();
-    camera.style.transition = transicao;
-    const cx = innerWidth / 2;
-    const cy = innerHeight / 2;
-    const px = r.left + r.width / 2;
-    const py = r.top + r.height / 2;
-    const escala = Math.min((innerHeight * 0.9) / r.height, (innerWidth * 0.8) / r.width, 7);
-    camera.style.transformOrigin = `${px}px ${py}px`;
-    camera.style.transform = `translate(${cx - px}px, ${cy - py}px) scale(${escala})`;
-  }
-
-  function irParaPorta(acao) {
+  async function irParaPorta(acao) {
+    if (passagem) { concluir(); return; } // clique repetido: termina na hora, sem travar
     destino = acao;
     UC.Som.clique();
     entrada.classList.add('oculto');
     dicaSom.classList.add('oculto');
+    UC.Velas.pausar();
+    const s = passagem = { pulado: false };
 
-    if (UC.Ajustes.get('reduzido')) {
+    if (reduzido()) {
+      UC.Porta.abrir('escolha');
       veu.classList.add('escuro', 'ativo');
-      esperar(450, concluir);
+      await esperar(350);
+      if (!s.pulado) concluir();
       return;
     }
-
     pular.hidden = false;
     pular.focus({ preventScroll: true });
-    camera.style.transition = 'transform 3s cubic-bezier(.45,.05,.25,1)';
-    requestAnimationFrame(enquadrarPorta);
-    esperar(2300, () => { porta.classList.add('aberta'); UC.Som.rangido(); });
-    esperar(3000, () => veu.classList.add('ativo'));
-    esperar(3700, concluir);
+    const camera = UC.Camera.naPorta(1300);
+    await esperar(450);
+    if (s.pulado) return;
+    await UC.Porta.abrir('escolha');
+    await camera;
+    if (s.pulado) return;
+    veu.classList.add('ativo');   // a luz de dentro toma a tela e esconde a troca
+    await esperar(650);
+    if (!s.pulado) concluir();
   }
 
   function concluir() {
-    timers.forEach(clearTimeout);
-    timers = [];
+    if (passagem) passagem.pulado = true;
+    passagem = null;
     pular.hidden = true;
-    porta.classList.add('aberta');
-    camera.style.transition = 'none';
-    enquadrarPorta();
+    UC.Porta.concluir();
+    if (UC.Porta.estado === 'fechada') UC.Porta.abrir(destino === 'todos-prontos' ? 'todos-prontos' : 'escolha');
+    UC.Camera.naPorta(0);
     veu.classList.add('ativo');
+    if (destino === 'todos-prontos') { mostrarSalao(); return; }
     if (destino === 'sala') UC.Sala.abrir(convite);
     else mostrarFormulario(destino);
   }
@@ -104,19 +102,63 @@
   function voltar() {
     UC.Som.clique();
     proxima.hidden = true;
-    camera.style.transition = 'none';
-    camera.style.transform = '';
-    porta.classList.remove('aberta');
+    UC.Porta.fechar();
+    UC.Camera.normal();
     veu.classList.remove('escuro');
     veu.classList.add('ativo');
     requestAnimationFrame(() => requestAnimationFrame(() => {
       veu.classList.remove('ativo');
       entrada.classList.remove('oculto');
+      UC.Velas.retomar();
       entrada.querySelector(`[data-acao="${destino}"]`)?.focus({ preventScroll: true });
     }));
   }
 
-  // ---------- Próxima etapa (formulários) ----------
+  // ---------- Momento 2: todos prontos → a porta abre de novo ----------
+  // Chamado pela sala (UC.Sala) quando todos estão logados, com personagem e prontos.
+  // Para ligar ao servidor depois, basta chamar UC.Entrada.todosProntos() quando o estado da sala mudar.
+  async function todosProntos() {
+    if (passagem) return;
+    destino = 'todos-prontos';
+    const s = passagem = { pulado: false };
+    $('#sala').hidden = true;
+    UC.Porta.fechar();
+    UC.Camera.normal();
+    if (reduzido()) { UC.Porta.abrir('todos-prontos'); concluir(); return; }
+    veu.classList.remove('escuro');
+    // revela a sala com a porta fechada; a câmera vai até ela e ela abre
+    requestAnimationFrame(() => requestAnimationFrame(() => veu.classList.remove('ativo')));
+    pular.hidden = false;
+    await esperar(700);
+    if (s.pulado) return;
+    const camera = UC.Camera.naPorta(1400, 1.8);
+    await esperar(600);
+    if (s.pulado) return;
+    await UC.Porta.abrir('todos-prontos');
+    await camera;
+    if (s.pulado) return;
+    veu.classList.add('ativo');
+    await esperar(700);
+    if (!s.pulado) concluir();
+  }
+  function mostrarSalao() {
+    const pj = $('#porta-jogo');
+    pj.hidden = false;
+    UC.Som.erro();
+    pj.querySelector('.pj-voltar').focus();
+  }
+  function voltarParaSala() {
+    UC.Som.clique();
+    $('#porta-jogo').hidden = true;
+    destino = 'sala';
+    $('#sala').hidden = false;
+    $('#sala .pronto')?.focus();
+  }
+  $('#porta-jogo .pj-voltar').addEventListener('click', voltarParaSala);
+
+  UC.Entrada = { todosProntos };
+
+  // ---------- Formulários ----------
   const fCriar = $('#form-criar');
   const fEntrar = $('#form-entrar');
 
@@ -155,6 +197,7 @@
     } catch (err) { /* ignora */ }
     UC.Som.clique();
     convite = dados;
+    destino = 'sala';
     proxima.hidden = true;
     UC.Sala.abrir(dados);
   }
@@ -171,6 +214,7 @@
     const acao = b.dataset.acao;
     if (acao === 'config') {
       UC.Som.clique();
+      UC.Velas.pausar();
       preencherConfig();
       dialogo.showModal();
     } else {
@@ -182,7 +226,6 @@
     if (e.key === 'Escape' && !pular.hidden) { e.preventDefault(); concluir(); }
   });
   $('#proxima .voltar').addEventListener('click', voltar);
-  window.addEventListener('resize', () => { if (!proxima.hidden || !$('#sala').hidden) enquadrarPorta(); });
 
   // Convite vindo do painel do Mentes Pensantes: a tela mostra "Abrir a porta"
   let convite = null;
@@ -205,6 +248,7 @@
   if (location.hash === '#entrar') {
     history.replaceState(null, '', location.pathname);
     entrada.classList.add('oculto');
+    UC.Velas.pausar();
     destino = 'entrar';
     concluir();
   }
