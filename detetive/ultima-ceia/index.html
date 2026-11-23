@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Última Ceia</title>
+  <meta name="description" content="Ninguém sai antes da meia-noite. Um mistério cooperativo de Natal.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Cormorant+Garamond:ital,wght@1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/entrada.css">
+</head>
+<body>
+
+  <!-- ===================== CENÁRIO ===================== -->
+  <div id="camera" aria-hidden="true">
+    <svg id="cena" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="g-parede" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#140c0f"/>
+          <stop offset="1" stop-color="#21141a"/>
+        </linearGradient>
+        <pattern id="p-papel" width="48" height="48" patternUnits="userSpaceOnUse">
+          <path d="M24 0v48" stroke="#ffffff" stroke-opacity=".022" stroke-width="10"/>
+          <path d="M24 14l5 10-5 10-5-10z" fill="#c9a050" fill-opacity=".05"/>
+        </pattern>
+        <linearGradient id="g-piso" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#1c110c"/>
+          <stop offset="1" stop-color="#080504"/>
+        </linearGradient>
+        <linearGradient id="g-ceu" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#08131f"/>
+          <stop offset=".6" stop-color="#11263a"/>
+          <stop offset="1" stop-color="#0a1621"/>
+        </linearGradient>
+        <linearGradient id="g-cone" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffd99a" stop-opacity=".0"/>
+          <stop offset=".25" stop-color="#ffd99a" stop-opacity=".16"/>
+          <stop offset="1" stop-color="#ffd99a" stop-opacity=".05"/>
+        </linearGradient>
+        <radialGradient id="g-foco" cx=".5" cy=".5" r=".5">
+          <stop offset="0" stop-color="#ffcf8a" stop-opacity=".45"/>
+          <stop offset="1" stop-color="#ffcf8a" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="g-vela" cx=".5" cy=".5" r=".5">
+          <stop offset="0" stop-color="#ffcf7a" stop-opacity=".75"/>
+          <stop offset="1" stop-color="#ffcf7a" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="g-arvore" cx=".5" cy=".5" r=".5">
+          <stop offset="0" stop-color="#ffb867" stop-opacity=".22"/>
+          <stop offset="1" stop-color="#ffb867" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="g-atras-porta" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffe7bd"/>
+          <stop offset="1" stop-color="#c98a45"/>
+        </linearGradient>
+        <radialGradient id="g-vinheta" cx=".5" cy=".55" r=".75">
+          <stop offset=".45" stop-color="#000" stop-opacity="0"/>
+          <stop offset="1" stop-color="#000" stop-opacity=".88"/>
+        </radialGradient>
+        <pattern id="p-chuva" width="70" height="140" patternUnits="userSpaceOnUse">
+          <path d="M12 0l-7 34M46 52l-7 34M30 96l-7 34M62 18l-5 24" stroke="#a9cbe2" stroke-opacity=".38" stroke-width="1.4" stroke-linecap="round"/>
+        </pattern>
+        <pattern id="p-chuva2" width="50" height="110" patternUnits="userSpaceOnUse">
+          <path d="M8 10l-4 20M34 60l-4 20" stroke="#a9cbe2" stroke-opacity=".2" stroke-width="1" stroke-linecap="round"/>
+        </pattern>
+        <clipPath id="clip-janela"><rect x="150" y="150" width="300" height="360"/></clipPath>
+        <filter id="f-desfoque" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+      </defs>
+
+      <!-- Parede e piso -->
+      <rect x="-1200" y="-600" width="4000" height="1240" fill="url(#g-parede)"/>
+      <rect x="-1200" y="-600" width="4000" height="1240" fill="url(#p-papel)"/>
+      <rect x="-1200" y="600" width="4000" height="40" fill="#170e0c"/>
+      <rect x="-1200" y="598" width="4000" height="3" fill="#3a2418" opacity=".7"/>
+      <rect x="-1200" y="640" width="4000" height="900" fill="url(#g-piso)"/>
+      <g stroke="#000" stroke-opacity=".35" stroke-width="2">
+        <path d="M-1200 690H2800M-1200 760H2800M-1200 850H2800"/>
+      </g>
+
+      <!-- Janela com chuva -->
+      <g id="janela">
+        <rect x="136" y="136" width="328" height="388" fill="#24150f"/>
+        <rect x="150" y="150" width="300" height="360" fill="url(#g-ceu)"/>
+        <circle cx="390" cy="210" r="46" fill="#9bb8cf" opacity=".12" filter="url(#f-desfoque)"/>
+        <g clip-path="url(#clip-janela)">
+          <rect class="chuva chuva-lenta" x="120" y="-140" width="360" height="800" fill="url(#p-chuva2)"/>
+          <rect class="chuva" x="120" y="-140" width="360" height="800" fill="url(#p-chuva)"/>
+          <g class="gotas" fill="#cfe3f2" opacity=".35">
+            <circle cx="190" cy="230" r="2.2"/><circle cx="260" cy="320" r="1.6"/><circle cx="350" cy="260" r="2"/>
+            <circle cx="410" cy="420" r="2.4"/><circle cx="220" cy="450" r="1.8"/><circle cx="330" cy="470" r="1.5"/>
+          </g>
+        </g>
+        <rect x="296" y="150" width="8" height="360" fill="#24150f"/>
+        <rect x="150" y="326" width="300" height="8" fill="#24150f"/>
+        <rect x="124" y="518" width="352" height="16" rx="2" fill="#2e1c14"/>
+        <path d="M96 120 Q132 120 160 128 Q150 300 168 540 L96 548 Z" fill="#3d0f18"/>
+        <path d="M110 130 Q124 330 118 546" stroke="#000" stroke-opacity=".3" stroke-width="6" fill="none"/>
+        <path d="M504 120 Q468 120 440 128 Q450 300 432 540 L504 548 Z" fill="#3d0f18"/>
+        <path d="M490 130 Q476 330 482 546" stroke="#000" stroke-opacity=".3" stroke-width="6" fill="none"/>
+        <rect x="86" y="112" width="428" height="10" rx="5" fill="#4a3220"/>
+      </g>
+
+      <!-- Relógio de parede -->
+      <g id="relogio">
+        <circle cx="1060" cy="210" r="38" fill="#2a1b12" stroke="#7a5a32" stroke-width="4"/>
+        <circle cx="1060" cy="210" r="30" fill="#d9ccb4" opacity=".55"/>
+        <g stroke="#2a1b12" stroke-width="2">
+          <path d="M1060 184v5M1060 231v5M1034 210h5M1081 210h5"/>
+        </g>
+        <path d="M1060 210 L1058 191" stroke="#1a100a" stroke-width="3.5" stroke-linecap="round"/>
+        <path class="ponteiro" d="M1060 210 L1056 186" stroke="#1a100a" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="1060" cy="210" r="2.5" fill="#1a100a"/>
+      </g>
+
+      <!-- Árvore de Natal -->
+      <g id="arvore">
+        <ellipse cx="600" cy="420" rx="230" ry="260" fill="url(#g-arvore)"/>
+        <polygon points="600,250 538,372 662,372" fill="#10291b"/>
+        <polygon points="600,306 512,462 688,462" fill="#0d2418"/>
+        <polygon points="600,384 486,566 714,566" fill="#0b1f15"/>
+        <polygon points="600,250 600,372 662,372" fill="#000" opacity=".18"/>
+        <polygon points="600,306 600,462 688,462" fill="#000" opacity=".18"/>
+        <polygon points="600,384 600,566 714,566" fill="#000" opacity=".18"/>
+        <rect x="589" y="566" width="22" height="34" fill="#2a170e"/>
+        <g fill="none" stroke="#c9a050" stroke-opacity=".35" stroke-width="1.5">
+          <path d="M556 352 Q600 372 646 346"/>
+          <path d="M532 440 Q600 466 672 432"/>
+          <path d="M508 540 Q600 572 696 530"/>
+        </g>
+        <path d="M600 226 l6 13 14 2-10 10 3 14-13-7-13 7 3-14-10-10 14-2z" fill="#c9a050" opacity=".75"/>
+        <g class="luzes">
+          <circle cx="570" cy="356" r="4" fill="#ffcf7a"/><circle cx="604" cy="366" r="4" fill="#ff8f6b" style="--d:.6s"/><circle cx="638" cy="352" r="4" fill="#ffe2a8" style="--d:1.2s"/>
+          <circle cx="546" cy="446" r="4" fill="#ff8f6b" style="--d:.3s"/><circle cx="584" cy="458" r="4" fill="#ffe2a8" style="--d:1.5s"/><circle cx="624" cy="456" r="4" fill="#ffcf7a" style="--d:.9s"/><circle cx="660" cy="440" r="4" fill="#ff8f6b" style="--d:2.1s"/>
+          <circle cx="524" cy="546" r="4" fill="#ffe2a8" style="--d:1.8s"/><circle cx="566" cy="560" r="4" fill="#ffcf7a" style="--d:.4s"/><circle cx="612" cy="562" r="4" fill="#ff8f6b" style="--d:1.1s"/><circle cx="654" cy="552" r="4" fill="#ffe2a8" style="--d:2.4s"/><circle cx="688" cy="536" r="4" fill="#ffcf7a" style="--d:.7s"/>
+        </g>
+        <!-- presentes fechados -->
+        <rect x="520" y="596" width="44" height="40" fill="#4a1420"/><rect x="539" y="596" width="6" height="40" fill="#b08a40" opacity=".7"/>
+        <rect x="574" y="608" width="52" height="30" fill="#1d3a2a"/><rect x="597" y="608" width="6" height="30" fill="#b08a40" opacity=".7"/>
+        <rect x="636" y="600" width="38" height="38" fill="#2b2338"/><rect x="652" y="600" width="6" height="38" fill="#b08a40" opacity=".7"/>
+      </g>
+
+      <!-- Porta -->
+      <g id="porta">
+        <rect id="porta-moldura" x="1186" y="236" width="188" height="404" fill="#22140d"/>
+        <rect x="1200" y="250" width="160" height="390" fill="url(#g-atras-porta)" class="luz-atras"/>
+        <g id="porta-folha">
+          <rect x="1200" y="250" width="160" height="390" fill="#3a2418"/>
+          <g fill="#33201a" stroke="#1e120c" stroke-width="3">
+            <rect x="1218" y="272" width="54" height="150"/><rect x="1288" y="272" width="54" height="150"/>
+            <rect x="1218" y="446" width="54" height="172"/><rect x="1288" y="446" width="54" height="172"/>
+          </g>
+          <circle cx="1280" cy="336" r="26" fill="none" stroke="#14301f" stroke-width="12"/>
+          <circle cx="1280" cy="336" r="26" fill="none" stroke="#1f4a2c" stroke-width="5" stroke-dasharray="3 5"/>
+          <path d="M1272 362 l8-8 8 8 -8 4z" fill="#6e1622"/>
+          <circle cx="1340" cy="452" r="6" fill="#c79a4a"/>
+        </g>
+        <rect class="fresta" x="1200" y="636" width="160" height="4" fill="#ffd08a"/>
+        <ellipse class="fresta" cx="1280" cy="646" rx="110" ry="10" fill="#ffd08a" opacity=".18" filter="url(#f-desfoque)"/>
+      </g>
+
+      <!-- Cone de luz sobre a cadeira vazia -->
+      <polygon class="cone" points="836,0 904,0 1010,640 730,640" fill="url(#g-cone)"/>
+      <g class="poeira" fill="#ffe8c0">
+        <circle cx="850" cy="200" r="1.6" style="--d:0s"/><circle cx="880" cy="300" r="1.2" style="--d:2s"/>
+        <circle cx="900" cy="140" r="1.4" style="--d:4s"/><circle cx="840" cy="380" r="1.1" style="--d:1s"/>
+        <circle cx="920" cy="420" r="1.5" style="--d:3s"/><circle cx="870" cy="480" r="1.2" style="--d:5s"/>
+      </g>
+
+      <!-- Cadeiras -->
+      <g id="cadeiras">
+        <g fill="#1d110c">
+          <rect x="688" y="476" width="46" height="90" rx="6"/>
+          <rect x="764" y="476" width="46" height="90" rx="6"/>
+          <rect x="954" y="476" width="46" height="90" rx="6"/>
+          <rect x="1030" y="476" width="46" height="90" rx="6"/>
+        </g>
+        <!-- cadeira vazia em destaque -->
+        <ellipse cx="870" cy="480" rx="120" ry="110" fill="url(#g-foco)"/>
+        <g id="cadeira-vazia">
+          <path d="M826 566 V430 Q826 384 870 378 Q914 384 914 430 V566 Z" fill="#3b2216"/>
+          <path d="M840 560 V436 Q840 400 870 394 Q900 400 900 436 V560 Z" fill="#4a2c1c"/>
+          <path d="M870 404 l4 8 9 1-6 6 2 9-9-4-9 4 2-9-6-6 9-1z" fill="#c9a050" opacity=".55"/>
+          <path d="M826 430 Q826 384 870 378 Q914 384 914 430" fill="none" stroke="#ffd99a" stroke-opacity=".35" stroke-width="2"/>
+        </g>
+      </g>
+
+      <!-- Mesa posta -->
+      <g id="mesa">
+        <polygon points="660,560 1080,560 1112,600 628,600" fill="#5a1520"/>
+        <rect x="628" y="600" width="484" height="74" fill="#43101a"/>
+        <path d="M628 600 Q650 690 676 674 Q700 690 724 674 Q748 690 772 674 Q796 690 820 674 Q844 690 868 674 Q892 690 916 674 Q940 690 964 674 Q988 690 1012 674 Q1036 690 1060 674 Q1084 690 1112 600" fill="#43101a"/>
+        <rect x="628" y="600" width="484" height="5" fill="#7a2a33" opacity=".7"/>
+        <g fill="#d8cfc4" opacity=".55">
+          <ellipse cx="712" cy="580" rx="24" ry="7"/><ellipse cx="788" cy="580" rx="24" ry="7"/>
+          <ellipse cx="870" cy="582" rx="26" ry="7.5"/>
+          <ellipse cx="952" cy="580" rx="24" ry="7"/><ellipse cx="1028" cy="580" rx="24" ry="7"/>
+        </g>
+        <g stroke="#e8e0d4" stroke-opacity=".5" stroke-width="2" fill="none">
+          <path d="M738 556 h8 l-2 10 h-4 z M742 566 v8"/><path d="M996 556 h8 l-2 10 h-4 z M1000 566 v8"/>
+        </g>
+        <!-- velas -->
+        <g class="vela">
+          <circle cx="826" cy="510" r="38" fill="url(#g-vela)"/>
+          <rect x="822" y="524" width="8" height="40" fill="#e9dfcf"/>
+          <ellipse class="chama" cx="826" cy="517" rx="4" ry="8" fill="#ffd27a"/>
+        </g>
+        <g class="vela" style="--d:.7s">
+          <circle cx="914" cy="510" r="38" fill="url(#g-vela)"/>
+          <rect x="910" y="524" width="8" height="40" fill="#e9dfcf"/>
+          <ellipse class="chama" cx="914" cy="517" rx="4" ry="8" fill="#ffd27a"/>
+        </g>
+      </g>
+
+      <rect width="1600" height="900" fill="url(#g-vinheta)" pointer-events="none"/>
+    </svg>
+  </div>
+
+  <div id="veu" aria-hidden="true"></div>
+
+  <!-- ===================== INTERFACE ===================== -->
+  <main id="entrada">
+    <a class="voltar-hub" href="../../#detetive">‹ Mentes Pensantes</a>
+    <header class="titulo">
+      <h1>ÚLTIMA CEIA</h1>
+      <p class="lema">Ninguém sai antes da meia-noite.</p>
+    </header>
+
+    <nav class="menu" aria-label="Menu principal">
+      <button class="btn btn-principal" data-acao="criar">Criar uma sala</button>
+      <button class="btn" data-acao="entrar">Entrar com código</button>
+      <button class="btn btn-discreto" data-acao="config">Configurações</button>
+    </nav>
+  </main>
+
+  <p id="dica-som" role="status">Toque ou clique em qualquer lugar para ativar o som</p>
+
+  <button id="pular" class="btn btn-discreto" hidden>Pular animação ›</button>
+
+  <!-- Próxima etapa (formulários) -->
+  <section id="proxima" hidden aria-live="polite">
+    <div class="painel">
+      <form id="form-criar" hidden>
+        <h2>Criar uma sala</h2>
+        <label>Seu nome
+          <input name="nome" maxlength="24" autocomplete="nickname" required>
+        </label>
+        <label>Número de participantes
+          <select name="max">
+            <option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option selected>10</option>
+          </select>
+        </label>
+        <button class="btn btn-principal" type="submit">Abrir a sala</button>
+        <p class="aviso" hidden></p>
+      </form>
+      <form id="form-entrar" hidden>
+        <h2>Entrar com código</h2>
+        <label>Seu nome
+          <input name="nome" maxlength="24" autocomplete="nickname" required>
+        </label>
+        <label>Código da sala
+          <input name="codigo" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" required class="codigo">
+        </label>
+        <button class="btn btn-principal" type="submit">Entrar</button>
+        <p class="aviso" hidden></p>
+      </form>
+      <button class="btn btn-discreto voltar" type="button">‹ Voltar</button>
+    </div>
+  </section>
+
+  <!-- Configurações -->
+  <dialog id="config" aria-labelledby="config-titulo">
+    <form method="dialog" class="painel">
+      <h2 id="config-titulo">Configurações</h2>
+      <label class="linha">Volume da música
+        <input type="range" min="0" max="100" step="5" name="musica">
+        <output></output>
+      </label>
+      <label class="linha">Volume dos efeitos
+        <input type="range" min="0" max="100" step="5" name="efeitos">
+        <output></output>
+      </label>
+      <label class="linha alternar">Movimento reduzido
+        <input type="checkbox" name="reduzido">
+      </label>
+      <fieldset class="linha">
+        <legend>Tamanho do texto</legend>
+        <div class="segmentos">
+          <label><input type="radio" name="texto" value="p"><span>A</span></label>
+          <label><input type="radio" name="texto" value="m"><span>A</span></label>
+          <label><input type="radio" name="texto" value="g"><span>A</span></label>
+        </div>
+      </fieldset>
+      <button class="btn btn-principal" value="ok">Fechar</button>
+    </form>
+  </dialog>
+
+  <script src="js/ajustes.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/entrada.js"></script>
+</body>
+</html>

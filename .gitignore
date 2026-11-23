@@ -1,0 +1,9 @@
+# Segredos dos casos (cartas privadas, soluções). O repositório é público: nunca enviar.
+segredos/
+*.docx
+
+# Configurações locais
+.claude/
+.vscode/
+Thumbs.db
+.DS_Store
