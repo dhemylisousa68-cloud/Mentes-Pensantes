@@ -3,14 +3,20 @@ window.UC = window.UC || {};
 
 UC.Ajustes = (() => {
   const CHAVE = 'mp_ajustes';
+  // As animações fazem parte da jogabilidade, então vêm sempre ligadas.
+  // "Movimento reduzido" só vale quando a pessoa escolhe em Configurações
+  // (muitos notebooks com Windows pedem menos movimento só por terem as animações do sistema desligadas).
   const padrao = {
     musica: 60,
     efeitos: 70,
-    reduzido: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    reduzido: false,
+    reduzidoEscolhido: false,
     texto: 'm',
   };
   let valores = { ...padrao };
   try { Object.assign(valores, JSON.parse(localStorage.getItem(CHAVE) || '{}')); } catch (e) { /* sem armazenamento */ }
+  // versões anteriores copiavam a preferência do sistema; só mantém se foi escolha da pessoa
+  if (!valores.reduzidoEscolhido) valores.reduzido = false;
 
   const ouvintes = [];
 
@@ -22,6 +28,7 @@ UC.Ajustes = (() => {
 
   function definir(chave, valor) {
     valores[chave] = valor;
+    if (chave === 'reduzido') valores.reduzidoEscolhido = true;
     try { localStorage.setItem(CHAVE, JSON.stringify(valores)); } catch (e) { /* ignora */ }
     aplicar();
     ouvintes.forEach((fn) => fn(valores));
