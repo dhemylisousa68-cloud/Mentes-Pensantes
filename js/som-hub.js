@@ -202,6 +202,37 @@ MP.Som = (() => {
     env(g2, t + .05, .06, .005, .8);
     o.connect(g2); g2.connect(efeitos); g2.connect(reverb); o.start(t); o.stop(t + 1);
   }
+  // Toque curto de sinos (guizos)
+  function sinos(duracao = .55) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const n = Math.round(duracao / .05);
+    for (let i = 0; i < n; i++) {
+      const t = t0 + i * .05 + Math.random() * .02;
+      const forca = 1 - (i / n) * .6;
+      [2637, 3520, 4699].forEach((f) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = f * (1 + (Math.random() - .5) * .03);
+        env(g, t, .035 * forca, .002, .22);
+        o.connect(g); g.connect(efeitos); g.connect(reverb); o.start(t); o.stop(t + .3);
+      });
+      const s = ruido(.06), fh = ctx.createBiquadFilter(), gh = ctx.createGain();
+      fh.type = 'highpass'; fh.frequency.value = 6500;
+      env(gh, t, .05 * forca, .002, .05);
+      s.connect(fh); fh.connect(gh); gh.connect(efeitos); s.start(t);
+    }
+  }
+  function shh() {
+    if (!ctx) return;
+    const t = ctx.currentTime, s = ruido(.9), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    f.type = 'bandpass'; f.frequency.value = 4200; f.Q.value = .8;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(.22, t + .12);
+    g.gain.setValueAtTime(.22, t + .5);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + .85);
+    s.connect(f); f.connect(g); g.connect(efeitos); s.start(t);
+  }
+
   function clique() {
     if (!ctx) return;
     const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
@@ -218,7 +249,7 @@ MP.Som = (() => {
   }
 
   return {
-    iniciar, tocarMusica, pararMusica, drone, tique, zumbidoLuz, brilho, impacto, puf, risada, lamina, clique,
+    iniciar, tocarMusica, pararMusica, drone, tique, zumbidoLuz, brilho, impacto, puf, sinos, shh, clique,
     alternarMudo, get mudo() { return mudo; }, get ativo() { return !!ctx; },
   };
 })();

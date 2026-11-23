@@ -1,7 +1,7 @@
 // Mentes Pensantes: portão, intro e tela principal de seleção de casos.
 (() => {
   // ---------- Catálogo de casos ----------
-  // Para adicionar um caso: inclua um objeto aqui. "roupa" é a roupa que o mascote veste ao selecionar.
+  // Para adicionar um caso: inclua um objeto aqui. "roupa" é a roupa que o mascote veste ao apresentar o caso.
   const CASOS = [
     {
       id: 'ultima-ceia',
@@ -11,7 +11,6 @@
       caminho: 'detetive/ultima-ceia/',
       capa: '316,704,364,210',
       roupa: 'natal',
-      fala: '<strong>A Última Ceia.</strong> Uma festa de Natal, dez convidados e uma cadeira vazia. Ninguém sai antes da meia-noite.',
     },
   ];
   const LARGURA_REF = 1672, ALTURA_REF = 941;
@@ -21,7 +20,6 @@
   const reduzido = () => UC.Ajustes.get('reduzido');
   const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  // Recorte de uma área da imagem de referência como fundo de um elemento
   function recortar(el, spec) {
     const [x, y, w, h] = spec.split(',').map(Number);
     el.style.backgroundSize = `${(LARGURA_REF / w) * 100}% ${(ALTURA_REF / h) * 100}%`;
@@ -31,20 +29,13 @@
 
   // ---------- Telas ----------
   const portao = $('#portao'), intro = $('#intro'), hub = $('#hub');
-  let mascoteIntro = null, mascoteHub = null;
+  let mascoteIntro = null, mascote = null;
   let introTimers = [];
   let introAtiva = false;
 
-  function mostrar(tela) {
-    [portao, intro, hub].forEach((t) => { t.hidden = t !== tela; });
-  }
-
-  function vistaNestaSessao() {
-    try { return sessionStorage.getItem('mp_intro') === '1'; } catch (e) { return false; }
-  }
-  function marcarVista() {
-    try { sessionStorage.setItem('mp_intro', '1'); } catch (e) { /* ignora */ }
-  }
+  function mostrar(tela) { [portao, intro, hub].forEach((t) => { t.hidden = t !== tela; }); }
+  function vistaNestaSessao() { try { return sessionStorage.getItem('mp_intro') === '1'; } catch (e) { return false; } }
+  function marcarVista() { try { sessionStorage.setItem('mp_intro', '1'); } catch (e) { /* ignora */ } }
 
   // ---------- Intro ----------
   function agendarIntro(ms, fn) { introTimers.push(setTimeout(fn, ms)); }
@@ -63,7 +54,6 @@
       agendarIntro(1800, irParaHub);
       return;
     }
-
     MP.Som.drone(5.5);
     [0.4, 1.4, 2.4].forEach((s) => MP.Som.tique(s));
     agendarIntro(700, () => mascoteIntro.olharDirecao(-1, 0));
@@ -87,10 +77,7 @@
     introTimers = [];
     marcarVista();
     intro.classList.add('sair');
-    setTimeout(() => {
-      intro.classList.remove('sair', 'luz', 'titulo');
-      abrirHub();
-    }, reduzido() ? 0 : 500);
+    setTimeout(() => { intro.classList.remove('sair', 'luz', 'titulo'); abrirHub(); }, reduzido() ? 0 : 500);
   }
 
   // ---------- Tela principal ----------
@@ -98,21 +85,31 @@
   const balaoTexto = balao.querySelector('.balao-texto');
   const balaoAcoes = balao.querySelector('.balao-acoes');
   const lista = $('#casos-lista');
+  const palco = $('.palco');
+  const caixaMascote = $('#mascote-hub');
+  const painel = $('#painel-sala');
+  const fundo = $('#painel-fundo');
+  const pularSeq = $('#pular-seq');
+
   let selecionado = null;
   let ocupado = false;
+  let seq = null;
+  let ocioso = null;
 
   function abrirHub() {
     mostrar(hub);
-    if (!mascoteHub) {
-      mascoteHub = MP.Mascote.criar($('#mascote-hub'));
+    if (!mascote) {
+      mascote = MP.Mascote.criar(caixaMascote);
       montarCasos();
     }
     if (MP.Som.ativo) MP.Som.tocarMusica();
   }
 
   function montarCasos() {
+    const luzes = '<span class="luzinhas" aria-hidden="true">' + '<i></i>'.repeat(11) + '</span>';
     lista.innerHTML = CASOS.map((c) => `
-      <button class="caso" data-id="${c.id}" aria-pressed="false">
+      <button class="caso" data-id="${c.id}" aria-pressed="false" aria-label="${esc(c.titulo)}, ${esc(c.tema)}, ${esc(c.jogadores)}">
+        ${luzes}
         <span class="caso-capa" data-recorte="${c.capa}"></span>
         <span class="caso-info">
           <span class="caso-titulo">${esc(c.titulo)}</span>
@@ -120,108 +117,299 @@
           <span class="caso-pill">${esc(c.jogadores)}</span>
         </span>
       </button>`).join('') + `
-      <div class="caso-breve" aria-label="Novos mistérios em breve"><span class="pasta" aria-hidden="true">🗂️</span><span>Novos mistérios<br>em breve</span></div>`;
+      <div class="caso-breve"><span class="pasta" aria-hidden="true">🗂️</span><span>Novos mistérios<br>em breve</span></div>`;
     lista.querySelectorAll('[data-recorte]').forEach((el) => recortar(el, el.dataset.recorte));
   }
 
-  function falar(html, botoes = []) {
+  function falar(html) {
     balaoTexto.innerHTML = html;
     balaoAcoes.innerHTML = '';
-    botoes.forEach(({ texto, classe, acao }) => {
-      const b = document.createElement('button');
-      b.className = 'botao ' + classe;
-      b.textContent = texto;
-      b.addEventListener('click', acao);
-      balaoAcoes.appendChild(b);
-    });
     balao.hidden = false;
-    // reinicia a animação do balão
     balao.style.animation = 'none'; void balao.offsetWidth; balao.style.animation = '';
   }
   function calar() { balao.hidden = true; }
 
-  async function selecionar(id) {
-    if (ocupado) return;
-    const caso = CASOS.find((c) => c.id === id);
-    if (selecionado === id) { falarSelecionado(caso); return; }
-    selecionado = id;
+  function travar(v) {
+    ocupado = v;
+    hub.classList.toggle('travado', v);
+  }
+
+  function marcarCartao(id) {
     lista.querySelectorAll('.caso').forEach((b) => {
       const sel = b.dataset.id === id;
       b.classList.toggle('selecionado', sel);
       b.setAttribute('aria-pressed', sel);
     });
-    MP.Som.puf();
-    ocupado = true;
-    await mascoteHub.vestir(caso.roupa);
-    ocupado = false;
-    falarSelecionado(caso);
   }
 
-  function falarSelecionado(caso) {
-    falar(caso.fala, [
-      { texto: 'OK, entrar', classe: 'botao-amarelo', acao: entrar },
-      { texto: 'Trocar', classe: 'botao-creme', acao: desmarcar },
-    ]);
-    balaoAcoes.querySelector('button').focus({ preventScroll: true });
+  // ----- Passar o mouse / focar o cartão -----
+  function focarCartao(cartao, ativo) {
+    if (ocupado || !painel.hidden || !mascote) return;
+    cartao.classList.toggle('aceso', ativo);
+    mascote.sobrancelha(ativo);
+    mascote.livre = !ativo;
+    if (ativo) mascote.olharElemento(cartao);
+  }
+  lista.addEventListener('pointerover', (e) => {
+    const c = e.target.closest('.caso');
+    if (c && e.pointerType === 'mouse' && !c.contains(e.relatedTarget)) focarCartao(c, true);
+  });
+  lista.addEventListener('pointerout', (e) => {
+    const c = e.target.closest('.caso');
+    if (c && e.pointerType === 'mouse' && !c.contains(e.relatedTarget)) focarCartao(c, false);
+  });
+  lista.addEventListener('focusin', (e) => { const c = e.target.closest('.caso'); if (c) focarCartao(c, true); });
+  lista.addEventListener('focusout', (e) => { const c = e.target.closest('.caso'); if (c) focarCartao(c, false); });
+
+  // ----- Mascote no canto (FLIP) -----
+  function moverMascote(paraCanto, animar) {
+    const antes = caixaMascote.getBoundingClientRect();
+    hub.classList.toggle('painel-aberto', paraCanto);
+    if (!animar || reduzido()) return;
+    const depois = caixaMascote.getBoundingClientRect();
+    const dx = antes.left - depois.left, dy = antes.top - depois.top;
+    const s = antes.width / depois.width;
+    caixaMascote.animate(
+      [{ transform: `translate(${dx}px, ${dy}px) scale(${s})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }],
+      { duration: 550, easing: 'cubic-bezier(.3, .9, .3, 1)' },
+    );
   }
 
-  async function desmarcar() {
-    if (ocupado || !selecionado) return;
+  function iniciarOcioso() {
+    clearInterval(ocioso);
+    ocioso = setInterval(() => {
+      if (!mascote || painel.hidden) return;
+      mascote.sobrancelha(true);
+      setTimeout(() => mascote.sobrancelha(false), 900);
+    }, 6500);
+  }
+
+  // ----- Painel -----
+  function preencherPainel(caso, aba) {
+    $('#ps-titulo').textContent = caso.titulo;
+    painel.querySelector('.ps-tema').textContent = `${caso.tema} · ${caso.jogadores}`;
+    recortar(painel.querySelector('.ps-capa'), caso.capa);
+    const nome = (() => { try { return localStorage.getItem('uc_nome') || ''; } catch (e) { return ''; } })();
+    painel.querySelectorAll('input[name="nome"]').forEach((i) => { if (!i.value) i.value = nome; });
+    painel.querySelector('.ps-aviso').hidden = true;
+    escolherAba(aba);
+  }
+
+  function escolherAba(aba) {
+    painel.querySelectorAll('[role="tab"]').forEach((t) => {
+      const ativa = t.dataset.aba === aba;
+      t.setAttribute('aria-selected', ativa);
+      t.tabIndex = ativa ? 0 : -1;
+    });
+    $('#ps-criar').hidden = aba !== 'criar';
+    $('#ps-entrar').hidden = aba !== 'entrar';
+    painel.querySelector('.ps-aviso').hidden = true;
+  }
+
+  function mostrarPainel(modo) {
+    painel.classList.remove('surgindo', 'suave');
+    fundo.hidden = false;
+    painel.hidden = false;
+    if (modo) painel.classList.add(modo);
+    const f = painel.querySelector('.ps-form:not([hidden])');
+    const alvo = f.nome.value ? (f.codigo || f.querySelector('button')) : f.nome;
+    alvo.focus({ preventScroll: true });
+  }
+
+  function fecharPainel({ trocar = false } = {}) {
+    if (ocupado || painel.hidden) return;
     MP.Som.clique();
-    selecionado = null;
-    calar();
-    lista.querySelectorAll('.caso').forEach((b) => { b.classList.remove('selecionado'); b.setAttribute('aria-pressed', 'false'); });
-    MP.Som.puf();
-    ocupado = true;
-    await mascoteHub.vestir('detetive');
-    ocupado = false;
+    painel.hidden = true;
+    fundo.hidden = true;
+    moverMascote(false, true);
+    mascote.livre = true;
+    if (trocar) {
+      selecionado = null;
+      marcarCartao(null);
+      MP.Som.puf();
+      mascote.vestir('detetive');
+      mascote.expressao('neutra');
+    }
+    (lista.querySelector('.caso.selecionado') || lista.querySelector('.caso'))?.focus({ preventScroll: true });
   }
 
-  async function entrar() {
-    if (ocupado || !selecionado) return;
-    const caso = CASOS.find((c) => c.id === selecionado);
-    ocupado = true;
-    MP.Som.clique();
+  // ----- Convite voando até virar o painel -----
+  async function voarConvite(s) {
+    const origem = mascote.retanguloConvite();
+    painel.hidden = false;
+    painel.classList.add('medindo');
+    const alvo = painel.getBoundingClientRect();
+    painel.classList.remove('medindo');
+    painel.hidden = true;
+
+    const voo = document.createElement('div');
+    voo.className = 'convite-voo';
+    voo.innerHTML = '<span class="cv-selo">?</span>';
+    Object.assign(voo.style, { left: alvo.left + 'px', top: alvo.top + 'px', width: alvo.width + 'px', height: alvo.height + 'px' });
+    document.body.appendChild(voo);
+    s.voo = voo;
+    mascote.braco('atras');
+    fundo.hidden = false;
+    moverMascote(true, true);
+    const anim = voo.animate([
+      { transform: `translate(${origem.left - alvo.left}px, ${origem.top - alvo.top}px) scale(${origem.width / alvo.width}, ${origem.height / alvo.height}) rotate(-10deg)` },
+      { transform: 'translate(0, -12px) scale(1.02) rotate(1deg)', offset: .8 },
+      { transform: 'none' },
+    ], { duration: 650, easing: 'cubic-bezier(.25, .8, .25, 1)', fill: 'forwards' });
+    try { await Promise.race([anim.finished, esperar(900)]); } catch (e) { /* cancelado */ }
+  }
+
+  // ----- Sequência de seleção -----
+  async function apresentarCaso(caso, aba = 'criar') {
+    if (ocupado) return;
+    MP.Som.iniciar();
+    travar(true);
     calar();
-    document.querySelectorAll('.botao, .caso').forEach((b) => { b.disabled = true; });
-    marcarVista();
+    selecionado = caso.id;
+    marcarCartao(caso.id);
+    preencherPainel(caso, aba);
 
     if (reduzido()) {
-      $('#cortina').classList.add('ativa');
-      await esperar(300);
-      location.href = caso.caminho;
+      MP.Som.sinos(.3);
+      finalizar(caso, aba, 'suave');
       return;
     }
 
-    MP.Som.pararMusica();
-    const risada = mascoteHub.risadaSombria();
-    setTimeout(() => MP.Som.risada(), 1100);
-    await risada;
-    MP.Som.lamina();
-    await mascoteHub.esconderFaca();
-    $('#cortina').classList.add('ativa');
-    await esperar(900);
-    location.href = caso.caminho;
+    const s = seq = { pulado: false, voo: null };
+    const passo = (ms) => esperar(ms).then(() => { if (s.pulado) throw new Error('pulado'); });
+    pularSeq.hidden = false;
+    pularSeq.focus({ preventScroll: true });
+
+    try {
+      // 0. troca de roupa com fumaça e sinos
+      MP.Som.sinos();
+      if (mascote.roupa !== caso.roupa) { MP.Som.puf(); mascote.vestir(caso.roupa); await passo(430); }
+      // 1. olha para o jogador e sorri maliciosamente
+      mascote.sobrancelha(false);
+      mascote.livre = false;
+      mascote.olharDirecao(0, 0.15);
+      mascote.braco('faca');
+      mascote.expressao('malicioso');
+      await passo(800);
+      // 2. esconde a faca atrás das costas, falsa inocência
+      mascote.braco('atras');
+      mascote.expressao('inocente');
+      mascote.olharDirecao(-0.4, -0.7);
+      await passo(850);
+      // 3. "shhh" e piscadela, com a frase
+      mascote.braco('shh');
+      mascote.expressao('shh');
+      mascote.olharDirecao(0, 0.1);
+      MP.Som.shh();
+      falar('Você foi convidado. <strong>Álibi não incluso.</strong>');
+      await passo(1150);
+      // 4. apresenta o convite, que se amplia e vira o painel
+      calar();
+      mascote.braco('convite');
+      mascote.expressao('sorriso');
+      MP.Som.sinos(.45);
+      await passo(520);
+      await voarConvite(s);
+      if (s.pulado) return;
+      finalizar(caso, aba, 'surgindo');
+    } catch (e) {
+      if (e.message !== 'pulado') throw e;
+    }
   }
 
+  function pular() {
+    if (!seq || seq.pulado) return;
+    seq.pulado = true;
+    const caso = CASOS.find((c) => c.id === selecionado);
+    const aba = $('#ps-entrar').hidden ? 'criar' : 'entrar';
+    finalizar(caso, aba, 'suave');
+  }
+
+  function finalizar(caso, aba, modo) {
+    if (seq && seq.voo) { seq.voo.remove(); seq.voo = null; }
+    seq = null;
+    pularSeq.hidden = true;
+    calar();
+    mascote.vestir(caso.roupa, { fumaca: false });
+    mascote.braco('atras');
+    mascote.expressao('sorriso');
+    mascote.sobrancelha(false);
+    mascote.livre = true;
+    if (!hub.classList.contains('painel-aberto')) moverMascote(true, modo !== 'suave');
+    escolherAba(aba);
+    mostrarPainel(modo);
+    travar(false);
+    iniciarOcioso();
+  }
+
+  // ----- Botões principais -----
   function jogarComAmigos() {
     MP.Som.clique();
-    if (selecionado) { entrar(); return; }
+    const caso = CASOS.find((c) => c.id === selecionado);
+    if (caso) { preencherPainel(caso, 'criar'); moverMascote(true, true); mostrarPainel('suave'); return; }
     const casos = $('.casos');
     casos.classList.remove('chamar'); void casos.offsetWidth; casos.classList.add('chamar');
-    mascoteHub.livre = false;
-    mascoteHub.olharDirecao(0, 1);
-    setTimeout(() => { mascoteHub.livre = true; }, 1400);
+    mascote.livre = false;
+    mascote.olharDirecao(0, 1);
+    setTimeout(() => { mascote.livre = true; }, 1400);
     falar('Primeiro, <strong>escolha um caso</strong> aqui embaixo.');
-    setTimeout(() => { if (!selecionado) calar(); }, 3200);
+    setTimeout(() => { if (!ocupado && painel.hidden) calar(); }, 3200);
   }
 
   function entrarComCodigo() {
     MP.Som.clique();
-    marcarVista();
-    const caso = CASOS.find((c) => c.id === selecionado) || CASOS[0];
-    location.href = caso.caminho + '#entrar';
+    const caso = CASOS.find((c) => c.id === selecionado);
+    if (caso) { preencherPainel(caso, 'entrar'); moverMascote(true, true); mostrarPainel('suave'); return; }
+    apresentarCaso(CASOS[0], 'entrar');
   }
+
+  // ----- Formulários do painel -----
+  function avisar(texto, erro) {
+    const a = painel.querySelector('.ps-aviso');
+    a.textContent = texto;
+    a.classList.toggle('erro', !!erro);
+    a.hidden = false;
+  }
+  function enviar(e) {
+    e.preventDefault();
+    const f = e.target;
+    const nome = f.nome.value.trim();
+    if (!nome) { avisar('Digite seu nome.', true); f.nome.focus(); return; }
+    const dados = { caso: selecionado, nome };
+    if (f.codigo) {
+      f.codigo.value = f.codigo.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (f.codigo.value.length !== 5) { avisar('O código tem 5 caracteres.', true); f.codigo.focus(); return; }
+      dados.acao = 'entrar'; dados.codigo = f.codigo.value;
+    } else {
+      dados.acao = 'criar'; dados.max = Number(f.max.value);
+    }
+    try {
+      localStorage.setItem('uc_nome', nome);
+      sessionStorage.setItem('mp_sala', JSON.stringify(dados));
+    } catch (err) { /* ignora */ }
+    MP.Som.sinos(.3);
+    avisar('Tudo certo! A sala de espera é a próxima etapa do desenvolvimento.');
+  }
+  $('#ps-criar').addEventListener('submit', enviar);
+  $('#ps-entrar').addEventListener('submit', enviar);
+  $('#ps-entrar').codigo.addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
+  painel.querySelector('.ps-abas').addEventListener('click', (e) => {
+    const t = e.target.closest('[role="tab"]');
+    if (!t) return;
+    MP.Som.clique();
+    escolherAba(t.dataset.aba);
+    painel.querySelector('.ps-form:not([hidden]) input').focus();
+  });
+  painel.querySelector('.ps-abas').addEventListener('keydown', (e) => {
+    if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    const atual = painel.querySelector('[role="tab"][aria-selected="true"]').dataset.aba;
+    const prox = atual === 'criar' ? 'entrar' : 'criar';
+    escolherAba(prox);
+    painel.querySelector(`[data-aba="${prox}"]`).focus();
+  });
+  painel.querySelector('.ps-fechar').addEventListener('click', () => fecharPainel());
+  painel.querySelector('.ps-trocar').addEventListener('click', () => fecharPainel({ trocar: true }));
+  fundo.addEventListener('click', () => fecharPainel());
 
   // ---------- Configurações ----------
   const dialogo = $('#config');
@@ -240,21 +428,28 @@
     else if (el.type === 'checkbox') UC.Ajustes.definir(el.name, el.checked);
     else if (el.type === 'radio') UC.Ajustes.definir(el.name, el.value);
   });
-  formCfg.addEventListener('change', (e) => { if (e.target.name === 'efeitos') MP.Som.clique(); });
+  formCfg.addEventListener('change', (e) => { if (e.target.name === 'efeitos') MP.Som.sinos(.25); });
 
   // ---------- Eventos ----------
   $('#comecar').addEventListener('click', iniciarIntro);
   $('#pular-intro').addEventListener('click', irParaHub);
+  pularSeq.addEventListener('click', pular);
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && introAtiva) { e.preventDefault(); irParaHub(); }
+    if (e.key !== 'Escape') return;
+    if (introAtiva) { e.preventDefault(); irParaHub(); }
+    else if (seq) { e.preventDefault(); pular(); }
+    else if (!painel.hidden) { e.preventDefault(); fecharPainel(); }
   });
 
   lista.addEventListener('click', (e) => {
     const b = e.target.closest('.caso');
-    if (b) selecionar(b.dataset.id);
+    if (!b || ocupado) return;
+    const caso = CASOS.find((c) => c.id === b.dataset.id);
+    if (selecionado === caso.id) { preencherPainel(caso, 'criar'); moverMascote(true, true); mostrarPainel('suave'); return; }
+    apresentarCaso(caso, 'criar');
   });
-  $('#btn-jogar').addEventListener('click', jogarComAmigos);
-  $('#btn-codigo').addEventListener('click', entrarComCodigo);
+  $('#btn-jogar').addEventListener('click', () => { if (!ocupado) jogarComAmigos(); });
+  $('#btn-codigo').addEventListener('click', () => { if (!ocupado) entrarComCodigo(); });
   $('#btn-config').addEventListener('click', () => { MP.Som.clique(); preencherConfig(); dialogo.showModal(); });
 
   const btnSom = $('#btn-som');
@@ -270,12 +465,11 @@
   });
   atualizarBotaoSom();
 
-  // Olhos seguem o ponteiro (mouse ou toque)
-  function seguir(e) { if (mascoteHub && !hub.hidden) mascoteHub.olharPara(e.clientX, e.clientY); }
+  // Olhos seguem o ponteiro
+  function seguir(e) { if (mascote && !hub.hidden) mascote.olharPara(e.clientX, e.clientY); }
   window.addEventListener('pointermove', seguir, { passive: true });
   window.addEventListener('pointerdown', seguir, { passive: true });
 
-  // Quando a intro é pulada nesta sessão, o som começa no primeiro toque
   function primeiroToque() {
     MP.Som.iniciar();
     if (!hub.hidden) MP.Som.tocarMusica();
@@ -283,10 +477,7 @@
     window.removeEventListener('keydown', primeiroToque);
   }
 
-  // Ao voltar do jogo pelo histórico, desfaz a cortina
-  window.addEventListener('pageshow', (e) => {
-    if (e.persisted) location.reload();
-  });
+  window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
 
   // ---------- Início ----------
   if (vistaNestaSessao()) {

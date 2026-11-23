@@ -96,7 +96,41 @@
       <div class="casos-lista" id="casos-lista"></div>
     </section>
 
-    <div class="cortina" id="cortina"></div>
+    <!-- Painel de sala (o convite se transforma nele) -->
+    <div class="painel-fundo" id="painel-fundo" hidden></div>
+    <section class="painel-sala" id="painel-sala" hidden role="dialog" aria-modal="true" aria-labelledby="ps-titulo">
+      <div class="ps-selo" aria-hidden="true">?</div>
+      <button class="ps-fechar" type="button" aria-label="Fechar">×</button>
+      <header class="ps-cabecalho">
+        <span class="ps-capa"></span>
+        <div>
+          <p class="ps-rotulo">Caso selecionado</p>
+          <h2 id="ps-titulo"></h2>
+          <p class="ps-tema"></p>
+        </div>
+      </header>
+      <p class="ps-frase">Você foi convidado. <strong>Álibi não incluso.</strong></p>
+      <div class="ps-abas" role="tablist" aria-label="Como você quer jogar">
+        <button type="button" role="tab" id="aba-criar" aria-controls="ps-criar" data-aba="criar">Criar sala</button>
+        <button type="button" role="tab" id="aba-entrar" aria-controls="ps-entrar" data-aba="entrar">Entrar com código</button>
+      </div>
+      <form id="ps-criar" class="ps-form" role="tabpanel" aria-labelledby="aba-criar">
+        <label>Seu nome <input name="nome" maxlength="24" autocomplete="nickname" required></label>
+        <label>Participantes
+          <select name="max"><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option selected>10</option></select>
+        </label>
+        <button class="botao botao-amarelo" type="submit">Criar sala</button>
+      </form>
+      <form id="ps-entrar" class="ps-form" role="tabpanel" aria-labelledby="aba-entrar" hidden>
+        <label>Seu nome <input name="nome" maxlength="24" autocomplete="nickname" required></label>
+        <label>Código da sala <input name="codigo" class="codigo" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" required></label>
+        <button class="botao botao-amarelo" type="submit">Entrar</button>
+      </form>
+      <p class="ps-aviso" role="status" hidden></p>
+      <button class="ps-trocar" type="button">Trocar de caso</button>
+    </section>
+
+    <button class="pular pular-seq" id="pular-seq" hidden>Pular ›</button>
   </section>
 
   <!-- ============ CONFIGURAÇÕES ============ -->
