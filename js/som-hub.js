@@ -248,8 +248,64 @@ MP.Som = (() => {
     return mudo;
   }
 
+  // ---------- ambiente: vento e neve (contínuo, no volume dos efeitos) ----------
+  let vento = null;
+  function ambiente(ligar = true) {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    if (!ligar) {
+      if (!vento) return;
+      const v = vento; vento = null;
+      v.g.gain.setTargetAtTime(0.0001, t, .5);
+      setTimeout(() => v.fontes.forEach((s) => { try { s.stop(); } catch (e) { /* já parou */ } }), 2500);
+      return;
+    }
+    if (vento) return;
+    const g = ctx.createGain(); g.gain.value = 0.0001; g.connect(efeitos);
+    g.gain.setTargetAtTime(.55, t, 1.6);
+    // rajadas: ruído num passa-banda cuja frequência e volume oscilam devagar, em ritmos diferentes
+    const fonte = ruido(5); fonte.loop = true;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 380; bp.Q.value = 1.4;
+    const lfo = ctx.createOscillator(); lfo.frequency.value = .061;
+    const lfoG = ctx.createGain(); lfoG.gain.value = 230; lfo.connect(lfoG); lfoG.connect(bp.frequency);
+    const vg = ctx.createGain(); vg.gain.value = .2;
+    const lfo2 = ctx.createOscillator(); lfo2.frequency.value = .137;
+    const lfo2G = ctx.createGain(); lfo2G.gain.value = .11; lfo2.connect(lfo2G); lfo2G.connect(vg.gain);
+    fonte.connect(bp); bp.connect(vg); vg.connect(g);
+    // assobio fino entre as frestas
+    const fonte2 = ruido(4); fonte2.loop = true;
+    const bp2 = ctx.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = 1150; bp2.Q.value = 9;
+    const vg2 = ctx.createGain(); vg2.gain.value = .035;
+    const lfo3 = ctx.createOscillator(); lfo3.frequency.value = .043;
+    const lfo3G = ctx.createGain(); lfo3G.gain.value = .03; lfo3.connect(lfo3G); lfo3G.connect(vg2.gain);
+    fonte2.connect(bp2); bp2.connect(vg2); vg2.connect(g);
+    const fontes = [fonte, fonte2, lfo, lfo2, lfo3];
+    fontes.forEach((s) => s.start());
+    vento = { g, fontes };
+  }
+
+  // passagem pela porta da mansão: rangido grave + sopro que cresce
+  function atravessar() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const s = ruido(2.4), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    f.type = 'lowpass'; f.frequency.setValueAtTime(260, t); f.frequency.exponentialRampToValueAtTime(3800, t + 1.7);
+    env(g, t, .45, 1.3, 1); s.connect(f); f.connect(g); g.connect(efeitos); g.connect(reverb); s.start(t);
+    const o = ctx.createOscillator(), bp = ctx.createBiquadFilter(), g2 = ctx.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(68, t); o.frequency.linearRampToValueAtTime(104, t + .6); o.frequency.linearRampToValueAtTime(58, t + 1.1);
+    bp.type = 'bandpass'; bp.frequency.value = 850; bp.Q.value = 7;
+    env(g2, t, .16, .12, 1); o.connect(bp); bp.connect(g2); g2.connect(efeitos); o.start(t); o.stop(t + 1.3);
+  }
+
+  // aba oculta: suspende o áudio; ao voltar, retoma
+  document.addEventListener('visibilitychange', () => {
+    if (!ctx) return;
+    if (document.hidden) ctx.suspend(); else ctx.resume();
+  });
+
   return {
-    iniciar, tocarMusica, pararMusica, drone, tique, zumbidoLuz, brilho, impacto, puf, sinos, shh, clique,
+    iniciar, tocarMusica, pararMusica, drone, tique, zumbidoLuz, brilho, impacto, puf, sinos, shh, clique, ambiente, atravessar,
     alternarMudo, get mudo() { return mudo; }, get ativo() { return !!ctx; },
   };
 })();

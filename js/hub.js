@@ -1,238 +1,218 @@
-// Mentes Pensantes: portão, intro e tela principal de seleção de casos.
+// Mentes Pensantes: portão, abertura e a tela principal na frente da mansão.
 (() => {
   // ---------- Catálogo de casos ----------
-  // Para adicionar um caso: inclua um objeto aqui. "roupa" é a roupa que o mascote veste ao apresentar o caso.
+  // Para adicionar um caso: inclua um objeto aqui e uma placa no cenário.
   const CASOS = [
     {
       id: 'ultima-ceia',
       titulo: 'A Última Ceia',
-      tema: '🎄 Mistério de Natal',
+      tema: 'Mistério de Natal',
       jogadores: '5–10 jogadores',
       caminho: 'detetive/ultima-ceia/',
-      capa: '316,704,364,210',
-      roupa: 'natal',
     },
   ];
-  const LARGURA_REF = 1672, ALTURA_REF = 941;
+
+  // ---------- Cenário (coordenadas da arte) ----------
+  const LARGURA = 1672, ALTURA = 941;
+  const PORTA = [1020, 505];
+  const LUZES = [[838, 322], [878, 345], [912, 365], [950, 365], [1150, 372], [1188, 397], [1223, 405]];
 
   const $ = (s) => document.querySelector(s);
   const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
   const reduzido = () => UC.Ajustes.get('reduzido');
   const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  function recortar(el, spec) {
-    const [x, y, w, h] = spec.split(',').map(Number);
-    el.style.backgroundSize = `${(LARGURA_REF / w) * 100}% ${(ALTURA_REF / h) * 100}%`;
-    el.style.backgroundPosition = `${(x / (LARGURA_REF - w)) * 100}% ${(y / (ALTURA_REF - h)) * 100}%`;
-  }
-  document.querySelectorAll('[data-recorte]').forEach((el) => recortar(el, el.dataset.recorte));
+  const portao = $('#portao'), hub = $('#hub');
+  const cena = $('#cena'), ui = $('#ui');
+  const lista = $('#casos-lista');
+  const balao = $('#balao'), balaoTexto = balao.querySelector('.balao-texto');
+  const painel = $('#painel-sala'), fundo = $('#painel-fundo');
+  const pularSeq = $('#pular-seq'), clarao = $('#clarao');
 
-  // ---------- Telas ----------
-  const portao = $('#portao'), intro = $('#intro'), hub = $('#hub');
-  let mascoteIntro = null, mascote = null;
-  let introTimers = [];
-  let introAtiva = false;
+  let mascote = null, neve = null;
+  let selecionado = null, ocupado = false, seq = null;
 
-  function mostrar(tela) { [portao, intro, hub].forEach((t) => { t.hidden = t !== tela; }); }
   function vistaNestaSessao() { try { return sessionStorage.getItem('mp_intro') === '1'; } catch (e) { return false; } }
   function marcarVista() { try { sessionStorage.setItem('mp_intro', '1'); } catch (e) { /* ignora */ } }
 
-  // ---------- Intro ----------
-  function agendarIntro(ms, fn) { introTimers.push(setTimeout(fn, ms)); }
+  // ---------- Câmera ----------
+  // A cena cobre a tela inteira. Em retrato, enquadra a porta e o mascote; a interface vira coluna.
+  const camera = { s: 1, x: 0, y: 0, zoom: 1, fx: LARGURA / 2, fy: ALTURA / 2 };
 
-  function iniciarIntro() {
-    MP.Som.iniciar();
-    mostrar(intro);
-    introAtiva = true;
-    mascoteIntro = MP.Mascote.criar($('#mascote-intro'), { sombra: true });
-    mascoteIntro.livre = false;
-    $('#pular-intro').focus({ preventScroll: true });
+  function base() {
+    const vw = innerWidth, vh = innerHeight;
+    const retrato = vw / vh < 1.05 || vw < 640;
+    hub.classList.toggle('retrato', retrato);
+    const s = Math.max(vw / LARGURA, vh / ALTURA);
+    // paisagem: se a tela for mais estreita que a arte, garante o mascote inteiro à direita
+    const xIdeal = retrato ? vw / 2 - 1205 * s : Math.min(vw / 2 - (LARGURA / 2) * s, vw - 1600 * s);
+    const x = Math.min(0, Math.max(vw - LARGURA * s, xIdeal));
+    const y = Math.min(0, Math.max(vh - ALTURA * s, vh / 2 - (ALTURA / 2) * s));
+    // a interface fica presa à borda esquerda, mesmo quando o cenário desliza
+    const uiX = Math.max(x, -56 * s);
+    return { s, x, y, uiX, retrato };
+  }
+  // transforma a cena para um zoom em torno de um ponto da arte (fx, fy), mantendo-o no mesmo lugar da tela
+  function transformacao(zoom = 1, fx = PORTA[0], fy = PORTA[1], puxar = 0) {
+    const b = base();
+    const s = b.s * zoom;
+    const telaX = b.x + fx * b.s, telaY = b.y + fy * b.s;
+    // "puxar" leva o ponto em direção ao centro da tela (0 a 1)
+    const alvoX = telaX + (innerWidth / 2 - telaX) * puxar, alvoY = telaY + (innerHeight / 2 - telaY) * puxar;
+    return { s, x: alvoX - fx * s, y: alvoY - fy * s, retrato: b.retrato };
+  }
+  const css = (t) => `translate(${t.x}px, ${t.y}px) scale(${t.s})`;
+  let enquadramento = { zoom: 1, fx: PORTA[0], fy: PORTA[1], puxar: 0 };
 
-    if (reduzido()) {
-      mascoteIntro.setSombra(false);
-      intro.classList.add('luz', 'titulo');
-      agendarIntro(1800, irParaHub);
-      return;
-    }
-    MP.Som.drone(5.5);
-    [0.4, 1.4, 2.4].forEach((s) => MP.Som.tique(s));
-    agendarIntro(700, () => mascoteIntro.olharDirecao(-1, 0));
-    agendarIntro(1600, () => mascoteIntro.olharDirecao(1, 0.2));
-    agendarIntro(2300, () => mascoteIntro.piscar());
-    agendarIntro(2700, () => mascoteIntro.olharDirecao(0, 0));
-    agendarIntro(3200, () => {
-      intro.classList.add('luz');
-      MP.Som.zumbidoLuz();
-      setTimeout(() => mascoteIntro.setSombra(false), 420);
-    });
-    agendarIntro(4500, () => { mascoteIntro.piscadela(); MP.Som.brilho(); });
-    agendarIntro(5700, () => { intro.classList.add('titulo'); MP.Som.impacto(); });
-    agendarIntro(8600, irParaHub);
+  function enquadrar() {
+    const t = transformacao(enquadramento.zoom, enquadramento.fx, enquadramento.fy, enquadramento.puxar);
+    cena.style.transform = css(t);
+    const b = base();
+    ui.style.transform = t.retrato ? '' : css({ s: b.s, x: b.uiX, y: b.y });
+    marcarFocos(t);
+    if (neve) neve.medir();
+  }
+  // posições da porta e do mascote na tela (para o destaque de luz)
+  function marcarFocos(t) {
+    const px = t.x + PORTA[0] * t.s, py = t.y + PORTA[1] * t.s;
+    hub.style.setProperty('--porta-x', `${px}px`);
+    hub.style.setProperty('--porta-y', `${py}px`);
+    const r = $('#mascote').getBoundingClientRect();
+    hub.style.setProperty('--masc-x', `${r.left + r.width * .5}px`);
+    hub.style.setProperty('--masc-y', `${r.top + r.height * .5}px`);
+    hub.style.setProperty('--masc-rx', `${r.width * .62}px`);
+    hub.style.setProperty('--masc-ry', `${r.height * .62}px`);
   }
 
-  function irParaHub() {
-    if (!introAtiva) return;
-    introAtiva = false;
-    introTimers.forEach(clearTimeout);
-    introTimers = [];
-    marcarVista();
-    intro.classList.add('sair');
-    setTimeout(() => { intro.classList.remove('sair', 'luz', 'titulo'); abrirHub(); }, reduzido() ? 0 : 500);
+  // movimento de câmera suave (WAAPI); resolve mesmo se a aba estiver oculta
+  async function moverCamera(novo, duracao, easing = 'cubic-bezier(.45, 0, .2, 1)') {
+    const de = cena.style.transform;
+    enquadramento = { ...enquadramento, ...novo };
+    const t = transformacao(enquadramento.zoom, enquadramento.fx, enquadramento.fy, enquadramento.puxar);
+    const para = css(t);
+    cena.style.transform = para;
+    marcarFocos(t);
+    if (reduzido() || !duracao) return;
+    const anim = cena.animate([{ transform: de }, { transform: para }], { duration: duracao, easing });
+    try { await Promise.race([anim.finished, esperar(duracao + 300)]); } catch (e) { /* cancelado */ }
   }
 
-  // ---------- Tela principal ----------
-  const balao = $('#balao');
-  const balaoTexto = balao.querySelector('.balao-texto');
-  const balaoAcoes = balao.querySelector('.balao-acoes');
-  const lista = $('#casos-lista');
-  const palco = $('.palco');
-  const caixaMascote = $('#mascote-hub');
-  const painel = $('#painel-sala');
-  const fundo = $('#painel-fundo');
-  const pularSeq = $('#pular-seq');
-
-  let selecionado = null;
-  let ocupado = false;
-  let seq = null;
-  let ocioso = null;
-
-  function abrirHub() {
-    mostrar(hub);
-    if (!mascote) {
-      mascote = MP.Mascote.criar(caixaMascote);
-      montarCasos();
-    }
-    if (MP.Som.ativo) MP.Som.tocarMusica();
-  }
-
-  function montarCasos() {
-    const luzes = '<span class="luzinhas" aria-hidden="true">' + '<i></i>'.repeat(11) + '</span>';
+  // ---------- Montagem ----------
+  function montar() {
+    $('#luzes').innerHTML = LUZES.map(([x, y], i) =>
+      `<i class="luz-bulbo" style="left:${x}px;top:${y}px;--dur:${(2.3 + (i * 0.47) % 1.9).toFixed(2)}s;--atraso:${(-i * .73).toFixed(2)}s"></i>`).join('');
+    const luzes = '<span class="luzinhas" aria-hidden="true">' + '<i></i>'.repeat(9) + '</span>';
     lista.innerHTML = CASOS.map((c) => `
-      <button class="caso" data-id="${c.id}" aria-pressed="false" aria-label="${esc(c.titulo)}, ${esc(c.tema)}, ${esc(c.jogadores)}">
-        ${luzes}
-        <span class="caso-capa" data-recorte="${c.capa}"></span>
-        <span class="caso-info">
-          <span class="caso-titulo">${esc(c.titulo)}</span>
-          <span class="caso-tema">${esc(c.tema)}</span>
-          <span class="caso-pill">${esc(c.jogadores)}</span>
-        </span>
-      </button>`).join('') + `
-      <div class="caso-breve"><span class="pasta" aria-hidden="true">🗂️</span><span>Novos mistérios<br>em breve</span></div>`;
-    lista.querySelectorAll('[data-recorte]').forEach((el) => recortar(el, el.dataset.recorte));
+      <button class="caso" type="button" data-id="${c.id}" aria-pressed="false">
+        ${luzes}<span class="sr">${esc(c.titulo)}, ${esc(c.tema)}, ${esc(c.jogadores)}</span>
+      </button>`).join('');
+    mascote = MP.Rig.criar($('#mascote'), { reduzido });
+    neve = MP.Neve.iniciar($('#neve'), { reduzido });
+    enquadrar();
+    window.addEventListener('resize', enquadrar);
   }
 
+  // ---------- Abertura ----------
+  let abertura = null;
+  async function abrirHub(comAbertura) {
+    portao.hidden = true;
+    const animar = comAbertura && !reduzido();
+    // já entra escuro e sem interface (sem transição de saída visível)
+    if (animar) hub.classList.add('abrindo', 'sem-ui', 'travado');
+    hub.hidden = false;
+    if (!mascote) montar();
+    if (MP.Som.ativo) { MP.Som.tocarMusica(); MP.Som.ambiente(true); }
+    if (!animar) { marcarVista(); return; }
+
+    // a cena acende do escuro, as luzes chegam, a placa desce balançando nas correntes
+    const s = abertura = { pulado: false };
+    const passo = (ms) => esperar(ms).then(() => { if (s.pulado) throw new Error('pulado'); });
+    pularSeq.hidden = false;
+    pularSeq.focus({ preventScroll: true });
+    try {
+      MP.Som.drone(5);
+      await passo(80);
+      hub.classList.add('revelando');
+      hub.classList.remove('abrindo');
+      await passo(1500);
+      MP.Som.zumbidoLuz();
+      await passo(700);
+      $('.placa-logo').classList.add('cair');
+      MP.Som.sinos(.5);
+      await passo(700);
+      MP.Som.impacto();
+      mascote.olharPara(innerWidth * .5, innerHeight * .5);
+      mascote.sacudir(.6);
+      await passo(500);
+      hub.classList.remove('sem-ui');
+      await passo(900);
+      terminarAbertura();
+    } catch (e) {
+      if (e.message !== 'pulado') throw e;
+    }
+  }
+  function terminarAbertura() {
+    if (!abertura) return;
+    abertura.pulado = true;
+    abertura = null;
+    hub.classList.remove('abrindo', 'revelando', 'sem-ui', 'travado');
+    pularSeq.hidden = true;
+    marcarVista();
+    $('#btn-jogar').focus({ preventScroll: true });
+  }
+
+  // ---------- Balão ----------
   function falar(html) {
-    balao.classList.remove('perto-rosto', 'ponta-direita', 'ponta-baixo');
-    balao.style.left = balao.style.top = '';
     balaoTexto.innerHTML = html;
-    balaoAcoes.innerHTML = '';
+    balao.classList.remove('ponta-direita', 'ponta-baixo');
     balao.hidden = false;
     balao.style.animation = 'none'; void balao.offsetWidth; balao.style.animation = '';
-  }
-  function calar() { balao.hidden = true; }
-
-  // Balão ao lado do rosto do mascote, com a ponta voltada para ele
-  function pontoNoMascote(x, y) {
-    const svg = mascote.elemento;
-    const p = svg.createSVGPoint();
-    p.x = x; p.y = y;
-    return p.matrixTransform(svg.getScreenCTM());
-  }
-  function falarPertoDoRosto(html) {
-    falar(html);
-    balao.classList.add('perto-rosto');
-    const rosto = pontoNoMascote(150, 300);
-    const b = { width: balao.offsetWidth, height: balao.offsetHeight };
-    let left = rosto.x - 24 - b.width;
-    let top = rosto.y - b.height * 0.85;
+    const rosto = mascote.pontoCabeca();
+    const w = balao.offsetWidth, h = balao.offsetHeight;
+    const r = $('#mascote').getBoundingClientRect();
+    let left = r.left + r.width * .12 - w - 10;
+    let top = rosto.y - h * .8;
     if (left >= 8) {
       balao.classList.add('ponta-direita');
     } else {
-      const topo = pontoNoMascote(300, 60);
-      left = Math.max(8, Math.min(innerWidth - b.width - 8, topo.x - b.width * 0.6));
-      top = topo.y - b.height - 14;
+      left = Math.max(8, Math.min(innerWidth - w - 8, rosto.x - w * .5));
+      top = r.top - h + r.height * .02;
       balao.classList.add('ponta-baixo');
-      balao.style.setProperty('--ponta-x', `${Math.max(20, Math.min(b.width - 20, rosto.x - left))}px`);
+      balao.style.setProperty('--ponta-x', `${Math.max(20, Math.min(w - 20, rosto.x - left))}px`);
     }
     balao.style.left = `${left}px`;
-    balao.style.top = `${Math.max(8, top)}px`;
+    balao.style.top = `${Math.max(64, top)}px`;
   }
+  function calar() { balao.hidden = true; }
 
-  // Centro da luz quente da cena = posição do mascote
-  function posicionarCena() {
-    const r = caixaMascote.getBoundingClientRect();
-    const h = hub.getBoundingClientRect();
-    hub.style.setProperty('--cena-x', `${((r.left + r.width / 2 - h.left) / h.width) * 100}%`);
-    hub.style.setProperty('--cena-y', `${((r.top + r.height * 0.45 - h.top) / h.height) * 100}%`);
-  }
-  const estreito = () => matchMedia('(max-width: 760px)').matches;
-
-  function travar(v) {
-    ocupado = v;
-    hub.classList.toggle('travado', v);
-  }
-
-  function marcarCartao(id) {
+  // ---------- Seleção de caso ----------
+  function travar(v) { ocupado = v; hub.classList.toggle('travado', v); }
+  function marcarCaso(id) {
     lista.querySelectorAll('.caso').forEach((b) => {
       const sel = b.dataset.id === id;
       b.classList.toggle('selecionado', sel);
       b.setAttribute('aria-pressed', sel);
     });
   }
-
-  // ----- Passar o mouse / focar o cartão -----
-  function focarCartao(cartao, ativo) {
+  function focarCaso(c, ativo) {
     if (ocupado || !painel.hidden || !mascote) return;
-    cartao.classList.toggle('aceso', ativo);
-    mascote.sobrancelha(ativo);
-    mascote.livre = !ativo;
-    if (ativo) mascote.olharElemento(cartao);
+    c.classList.toggle('aceso', ativo);
+    if (ativo) mascote.olharElemento(c);
   }
-  lista.addEventListener('pointerover', (e) => {
-    const c = e.target.closest('.caso');
-    if (c && e.pointerType === 'mouse' && !c.contains(e.relatedTarget)) focarCartao(c, true);
-  });
-  lista.addEventListener('pointerout', (e) => {
-    const c = e.target.closest('.caso');
-    if (c && e.pointerType === 'mouse' && !c.contains(e.relatedTarget)) focarCartao(c, false);
-  });
-  lista.addEventListener('focusin', (e) => { const c = e.target.closest('.caso'); if (c) focarCartao(c, true); });
-  lista.addEventListener('focusout', (e) => { const c = e.target.closest('.caso'); if (c) focarCartao(c, false); });
-
-  // ----- Mascote no canto (FLIP) -----
-  function moverMascote(paraCanto, animar) {
-    const antes = caixaMascote.getBoundingClientRect();
-    hub.classList.toggle('painel-aberto', paraCanto);
-    if (!animar || reduzido()) return;
-    const depois = caixaMascote.getBoundingClientRect();
-    const dx = antes.left - depois.left, dy = antes.top - depois.top;
-    const s = antes.width / depois.width;
-    caixaMascote.animate(
-      [{ transform: `translate(${dx}px, ${dy}px) scale(${s})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }],
-      { duration: 550, easing: 'cubic-bezier(.3, .9, .3, 1)' },
-    );
-  }
-
-  function iniciarOcioso() {
-    clearInterval(ocioso);
-    ocioso = setInterval(() => {
-      if (!mascote || painel.hidden || ocupado) return;
-      mascote.sobrancelha(true);
-      setTimeout(() => mascote.sobrancelha(false), 1100);
-    }, 8000);
-  }
+  lista.addEventListener('pointerover', (e) => { const c = e.target.closest('.caso'); if (c && !c.contains(e.relatedTarget)) focarCaso(c, true); });
+  lista.addEventListener('pointerout', (e) => { const c = e.target.closest('.caso'); if (c && !c.contains(e.relatedTarget)) focarCaso(c, false); });
+  lista.addEventListener('focusin', (e) => { const c = e.target.closest('.caso'); if (c) focarCaso(c, true); });
+  lista.addEventListener('focusout', (e) => { const c = e.target.closest('.caso'); if (c) focarCaso(c, false); });
 
   // ----- Painel -----
   function preencherPainel(caso, aba) {
     $('#ps-titulo').textContent = caso.titulo;
     painel.querySelector('.ps-tema').textContent = `${caso.tema} · ${caso.jogadores}`;
-    recortar(painel.querySelector('.ps-capa'), caso.capa);
     const nome = (() => { try { return localStorage.getItem('uc_nome') || ''; } catch (e) { return ''; } })();
     painel.querySelectorAll('input[name="nome"]').forEach((i) => { if (!i.value) i.value = nome; });
     painel.querySelector('.ps-aviso').hidden = true;
     escolherAba(aba);
   }
-
   function escolherAba(aba) {
     painel.querySelectorAll('[role="tab"]').forEach((t) => {
       const ativa = t.dataset.aba === aba;
@@ -243,7 +223,6 @@
     $('#ps-entrar').hidden = aba !== 'entrar';
     painel.querySelector('.ps-aviso').hidden = true;
   }
-
   function mostrarPainel(modo) {
     painel.classList.remove('surgindo', 'suave');
     fundo.hidden = false;
@@ -253,23 +232,19 @@
     const alvo = f.nome.value ? (f.codigo || f.querySelector('button')) : f.nome;
     alvo.focus({ preventScroll: true });
   }
-
   function fecharPainel({ trocar = false } = {}) {
     if (ocupado || painel.hidden) return;
     MP.Som.clique();
     painel.hidden = true;
     fundo.hidden = true;
-    moverMascote(false, true);
-    mascote.livre = true;
-    if (trocar) {
-      selecionado = null;
-      marcarCartao(null);
-      mascote.definir({ roupa: 'detetive', pose: 'detetive', gorro: 'nenhum', expressao: 'neutra' });
-    }
-    (lista.querySelector('.caso.selecionado') || lista.querySelector('.caso'))?.focus({ preventScroll: true });
+    hub.classList.remove('em-cena');
+    mascote.pose('repouso');
+    moverCamera({ zoom: 1, puxar: 0 }, 900);
+    if (trocar) { selecionado = null; marcarCaso(null); }
+    (lista.querySelector('.caso') || $('#btn-jogar')).focus({ preventScroll: true });
   }
 
-  // ----- Convite voando até virar o painel -----
+  // ----- O envelope voa da mão do mascote e vira o painel -----
   async function voarConvite(s) {
     const origem = mascote.retanguloConvite();
     painel.hidden = false;
@@ -277,99 +252,70 @@
     const alvo = painel.getBoundingClientRect();
     painel.classList.remove('medindo');
     painel.hidden = true;
-
     const voo = document.createElement('div');
     voo.className = 'convite-voo';
-    voo.innerHTML = '<span class="cv-selo">?</span>';
+    voo.innerHTML = '<span class="cv-selo">M</span>';
     Object.assign(voo.style, { left: alvo.left + 'px', top: alvo.top + 'px', width: alvo.width + 'px', height: alvo.height + 'px' });
-    document.body.appendChild(voo);
+    hub.appendChild(voo);
     s.voo = voo;
-    mascote.pose('atras');
     fundo.hidden = false;
-    moverMascote(true, true);
+    mascote.pose('segurar');
     const anim = voo.animate([
-      { transform: `translate(${origem.left - alvo.left}px, ${origem.top - alvo.top}px) scale(${origem.width / alvo.width}, ${origem.height / alvo.height}) rotate(-10deg)` },
-      { transform: 'translate(0, -12px) scale(1.02) rotate(1deg)', offset: .8 },
-      { transform: 'none' },
-    ], { duration: 650, easing: 'cubic-bezier(.25, .8, .25, 1)', fill: 'forwards' });
-    try { await Promise.race([anim.finished, esperar(900)]); } catch (e) { /* cancelado */ }
+      { transform: `translate(${origem.left - alvo.left}px, ${origem.top - alvo.top}px) scale(${origem.width / alvo.width}, ${origem.height / alvo.height}) rotate(-14deg)`, opacity: .9 },
+      { transform: 'translate(0, -14px) scale(1.02) rotate(1.5deg)', opacity: 1, offset: .78 },
+      { transform: 'none', opacity: 1 },
+    ], { duration: 700, easing: 'cubic-bezier(.25, .8, .25, 1)', fill: 'forwards' });
+    try { await Promise.race([anim.finished, esperar(1000)]); } catch (e) { /* cancelado */ }
   }
 
-  // ----- Sequência de seleção -----
+  // ----- Sequência: destaca a entrada e o mascote apresenta o convite -----
   async function apresentarCaso(caso, aba = 'criar') {
     if (ocupado) return;
     MP.Som.iniciar();
     travar(true);
     calar();
     selecionado = caso.id;
-    marcarCartao(caso.id);
+    marcarCaso(caso.id);
     preencherPainel(caso, aba);
+    const placa = lista.querySelector(`[data-id="${caso.id}"]`);
 
     if (reduzido()) {
       MP.Som.sinos(.3);
+      hub.classList.add('em-cena');
       finalizar(caso, aba, 'suave');
       return;
     }
-
     const s = seq = { pulado: false, voo: null };
     const passo = (ms) => esperar(ms).then(() => { if (s.pulado) throw new Error('pulado'); });
     pularSeq.hidden = false;
     pularSeq.focus({ preventScroll: true });
 
-    const cartao = lista.querySelector(`[data-id="${caso.id}"]`);
-    if (estreito()) palco.scrollIntoView({ block: 'center', behavior: 'smooth' });
-
     try {
-      // 1. percebe o clique: os olhos vão ao cartão, a cabeça acompanha um instante depois
-      mascote.livre = false;
-      mascote.sobrancelha(false);
-      mascote.olharElemento(cartao, { atraso: 220 });
+      // 1. percebe a escolha: a cabeça vira para a placa, as luzinhas acendem
+      mascote.olharElemento(placa);
       MP.Som.sinos(.35);
-      await passo(380);
+      await passo(500);
 
-      // 2. o ambiente muda: fundo escurece e uma luz quente destaca o mascote e o caso
-      posicionarCena();
+      // 2. a entrada da mansão se destaca e a câmera se aproxima um pouco
       hub.classList.add('em-cena');
-      await passo(400);
-      mascote.olhar(0, 0.12, { atraso: 160 });
-      await passo(320);
-
-      // 3. puxa o gorro sobre o rosto e, ao levantar, aparece de Natal
-      if (mascote.estado.roupa !== caso.roupa) {
-        mascote.definir({ pose: 'puxando', gorro: 'cobrindo' });
-        await passo(420);
-        mascote.elemento.classList.add('encolher');
-        mascote.definir({ roupa: caso.roupa });
-        await passo(380);
-        mascote.elemento.classList.remove('encolher');
-      }
-      mascote.definir({ gorro: 'normal', pose: 'faca', expressao: 'malicioso' });
-      await passo(560);
-
-      // 4. percebe que está exibindo a faca: olha para ela, pausa e esconde atrás das costas
-      mascote.olhar(0.85, -0.9, { atraso: 230 });
-      mascote.expressao('surpresa');
+      const zoom = base().retrato ? 1.06 : 1.14;
+      moverCamera({ zoom, fx: 1160, fy: 560, puxar: .25 }, 1500);
       await passo(650);
-      mascote.olhar(0, 0.1, { atraso: 170 });
-      await passo(180);
-      mascote.pose('atras');
-      await passo(520);
+      mascote.olharFrente();
+      await passo(450);
 
-      // 5. finge inocência: sorriso, sobrancelha erguida e o balão junto ao rosto
-      mascote.expressao('inocente');
-      mascote.sobrancelha(true);
-      await passo(240);
-      falarPertoDoRosto('Você foi convidado. <strong>Álibi não incluso.</strong>');
-      await passo(600);
-      mascote.piscar();
-      await passo(700);
-
-      // 6. oferece o convite, que vira o painel
-      calar();
-      mascote.sobrancelha(false);
-      mascote.pose('convite');
+      // 3. prepara (recolhe o braço) e oferece o envelope em direção ao jogador
+      mascote.pose('antecipar');
+      await passo(380);
+      mascote.pose('oferecer');
+      mascote.sacudir(.4);
       MP.Som.sinos(.45);
-      await passo(560);
+      await passo(450);
+      falar('Você foi convidado. <strong>Álibi não incluso.</strong>');
+      await passo(1700);
+
+      // 4. o envelope voa e vira o painel
+      calar();
       await voarConvite(s);
       if (s.pulado) return;
       finalizar(caso, aba, 'surgindo');
@@ -379,6 +325,7 @@
   }
 
   function pular() {
+    if (abertura) { terminarAbertura(); return; }
     if (!seq || seq.pulado) return;
     seq.pulado = true;
     const caso = CASOS.find((c) => c.id === selecionado);
@@ -391,38 +338,67 @@
     seq = null;
     pularSeq.hidden = true;
     calar();
-    hub.classList.remove('em-cena');
-    mascote.elemento.classList.remove('encolher');
-    mascote.definir({ roupa: caso.roupa, pose: 'atras', gorro: 'normal', expressao: 'inocente' });
-    mascote.sobrancelha(false);
-    mascote.livre = true;
-    if (!hub.classList.contains('painel-aberto')) moverMascote(true, modo !== 'suave');
+    hub.classList.add('em-cena');
+    if (enquadramento.zoom === 1) moverCamera({ zoom: base().retrato ? 1.06 : 1.14, fx: 1160, fy: 560, puxar: .25 }, modo === 'suave' ? 0 : 600);
+    mascote.pose('segurar');
+    mascote.olharFrente();
     escolherAba(aba);
     mostrarPainel(modo);
     travar(false);
-    iniciarOcioso();
+  }
+
+  // ----- Entrar: a câmera atravessa a porta e o clarão esconde a troca de cena -----
+  async function entrarNaMansao(caso) {
+    travar(true);
+    painel.hidden = true;
+    fundo.hidden = true;
+    hub.classList.add('saindo');
+    if (reduzido()) { location.href = caso.caminho; return; }
+    MP.Som.atravessar();
+    MP.Som.ambiente(false);
+    mascote.olharPara(innerWidth * .3, innerHeight * .5);
+    const camera = moverCamera({ zoom: 3.4, fx: PORTA[0], fy: PORTA[1], puxar: 1 }, 1700, 'cubic-bezier(.55, 0, .7, .4)');
+    await esperar(900);
+    clarao.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 750, easing: 'ease-in', fill: 'forwards' });
+    await camera;
+    await esperar(250);
+    location.href = caso.caminho;
   }
 
   // ----- Botões principais -----
-  function jogarComAmigos() {
-    MP.Som.clique();
-    const caso = CASOS.find((c) => c.id === selecionado);
-    if (caso) { preencherPainel(caso, 'criar'); moverMascote(true, true); mostrarPainel('suave'); return; }
-    const casos = $('.casos');
-    casos.classList.remove('chamar'); void casos.offsetWidth; casos.classList.add('chamar');
-    mascote.livre = false;
-    mascote.olharDirecao(0, 1);
-    setTimeout(() => { mascote.livre = true; }, 1400);
-    falar('Primeiro, <strong>escolha um caso</strong> aqui embaixo.');
-    setTimeout(() => { if (!ocupado && painel.hidden) calar(); }, 3200);
+  function pedirCaso() {
+    const c = lista.querySelector('.caso');
+    c.classList.remove('chamar'); void c.offsetWidth; c.classList.add('chamar');
+    mascote.olharElemento(c);
+    falar('Primeiro, <strong>escolha um caso</strong>: a placa ali no portão.');
+    setTimeout(() => { if (!ocupado && painel.hidden) { calar(); mascote.olharFrente(); } }, 3400);
   }
-
-  function entrarComCodigo() {
-    MP.Som.clique();
-    const caso = CASOS.find((c) => c.id === selecionado);
-    if (caso) { preencherPainel(caso, 'entrar'); moverMascote(true, true); mostrarPainel('suave'); return; }
-    apresentarCaso(CASOS[0], 'entrar');
+  function abrirPainelDireto(caso, aba) {
+    preencherPainel(caso, aba);
+    hub.classList.add('em-cena');
+    mascote.pose('segurar');
+    moverCamera({ zoom: base().retrato ? 1.06 : 1.14, fx: 1160, fy: 560, puxar: .25 }, 700);
+    mostrarPainel('suave');
   }
+  $('#btn-jogar').addEventListener('click', () => {
+    if (ocupado) return;
+    MP.Som.iniciar(); MP.Som.clique();
+    const caso = CASOS.find((c) => c.id === selecionado);
+    if (caso) abrirPainelDireto(caso, 'criar'); else pedirCaso();
+  });
+  $('#btn-codigo').addEventListener('click', () => {
+    if (ocupado) return;
+    MP.Som.iniciar(); MP.Som.clique();
+    const caso = CASOS.find((c) => c.id === selecionado);
+    if (caso) abrirPainelDireto(caso, 'entrar'); else apresentarCaso(CASOS[0], 'entrar');
+  });
+  lista.addEventListener('click', (e) => {
+    const b = e.target.closest('.caso');
+    if (!b || ocupado) return;
+    const caso = CASOS.find((c) => c.id === b.dataset.id);
+    if (selecionado === caso.id) { abrirPainelDireto(caso, 'criar'); return; }
+    apresentarCaso(caso, 'criar');
+  });
 
   // ----- Formulários do painel -----
   function avisar(texto, erro) {
@@ -450,10 +426,7 @@
     } catch (err) { /* ignora */ }
     MP.Som.sinos(.3);
     marcarVista();
-    const caso = CASOS.find((c) => c.id === selecionado);
-    avisar('Tudo certo! Abrindo a porta…');
-    f.querySelector('button[type="submit"]').disabled = true;
-    setTimeout(() => { location.href = caso.caminho; }, reduzido() ? 0 : 500);
+    entrarNaMansao(CASOS.find((c) => c.id === selecionado));
   }
   $('#ps-criar').addEventListener('submit', enviar);
   $('#ps-entrar').addEventListener('submit', enviar);
@@ -467,8 +440,7 @@
   });
   painel.querySelector('.ps-abas').addEventListener('keydown', (e) => {
     if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
-    const atual = painel.querySelector('[role="tab"][aria-selected="true"]').dataset.aba;
-    const prox = atual === 'criar' ? 'entrar' : 'criar';
+    const prox = painel.querySelector('[role="tab"][aria-selected="true"]').dataset.aba === 'criar' ? 'entrar' : 'criar';
     escolherAba(prox);
     painel.querySelector(`[data-aba="${prox}"]`).focus();
   });
@@ -494,27 +466,6 @@
     else if (el.type === 'radio') UC.Ajustes.definir(el.name, el.value);
   });
   formCfg.addEventListener('change', (e) => { if (e.target.name === 'efeitos') MP.Som.sinos(.25); });
-
-  // ---------- Eventos ----------
-  $('#comecar').addEventListener('click', iniciarIntro);
-  $('#pular-intro').addEventListener('click', irParaHub);
-  pularSeq.addEventListener('click', pular);
-  window.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    if (introAtiva) { e.preventDefault(); irParaHub(); }
-    else if (seq) { e.preventDefault(); pular(); }
-    else if (!painel.hidden) { e.preventDefault(); fecharPainel(); }
-  });
-
-  lista.addEventListener('click', (e) => {
-    const b = e.target.closest('.caso');
-    if (!b || ocupado) return;
-    const caso = CASOS.find((c) => c.id === b.dataset.id);
-    if (selecionado === caso.id) { preencherPainel(caso, 'criar'); moverMascote(true, true); mostrarPainel('suave'); return; }
-    apresentarCaso(caso, 'criar');
-  });
-  $('#btn-jogar').addEventListener('click', () => { if (!ocupado) jogarComAmigos(); });
-  $('#btn-codigo').addEventListener('click', () => { if (!ocupado) entrarComCodigo(); });
   $('#btn-config').addEventListener('click', () => { MP.Som.clique(); preencherConfig(); dialogo.showModal(); });
 
   const btnSom = $('#btn-som');
@@ -527,30 +478,42 @@
     MP.Som.alternarMudo();
     atualizarBotaoSom();
     MP.Som.tocarMusica();
+    MP.Som.ambiente(true);
   });
   atualizarBotaoSom();
 
-  // Olhos seguem o ponteiro
-  function seguir(e) { if (mascote && !hub.hidden) mascote.olharPara(e.clientX, e.clientY); }
+  // ---------- Eventos gerais ----------
+  $('#comecar').addEventListener('click', () => { MP.Som.iniciar(); abrirHub(true); });
+  pularSeq.addEventListener('click', pular);
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (abertura || seq) { e.preventDefault(); pular(); }
+    else if (!painel.hidden) { e.preventDefault(); fecharPainel(); }
+  });
+
+  // a cabeça acompanha o ponteiro
+  function seguir(e) { if (mascote && !hub.hidden && !ocupado && painel.hidden) mascote.olharPara(e.clientX, e.clientY); }
   window.addEventListener('pointermove', seguir, { passive: true });
   window.addEventListener('pointerdown', seguir, { passive: true });
 
+  // aba oculta: pausa as animações de CSS (a neve, o mascote e o som pausam sozinhos)
+  document.addEventListener('visibilitychange', () => document.documentElement.classList.toggle('pausado', document.hidden));
+
   function primeiroToque() {
     MP.Som.iniciar();
-    if (!hub.hidden) MP.Som.tocarMusica();
+    if (!hub.hidden) { MP.Som.tocarMusica(); MP.Som.ambiente(true); }
     window.removeEventListener('pointerdown', primeiroToque);
     window.removeEventListener('keydown', primeiroToque);
   }
-
   window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
 
   // ---------- Início ----------
   if (vistaNestaSessao()) {
-    abrirHub();
+    abrirHub(false);
     window.addEventListener('pointerdown', primeiroToque);
     window.addEventListener('keydown', primeiroToque);
   } else {
-    mostrar(portao);
+    portao.hidden = false;
     $('#comecar').focus({ preventScroll: true });
   }
 })();

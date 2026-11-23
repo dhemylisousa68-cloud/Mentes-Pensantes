@@ -1,1 +1,2 @@
-Coloque aqui as imagens das camadas do mascote (veja docs/mascote-camadas.md).
+natal.webp é a arte original do mascote, usada sem alteração.
+Peças extras para piscar, mover os olhos etc.: veja docs/cena-e-mascote.md.
