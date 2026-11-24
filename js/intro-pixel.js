@@ -1,6 +1,6 @@
 // Intro de apresentação do Mentes Pensantes, em pixel art (adaptada de Mentes_Pensantes_Pixel_Cadencia.html).
-// 0–4 s: o cérebro pulsa · 4–11 s: a lupa percorre o cérebro · 11–16,5 s: a lupa revela o interior da mente
-// 16,5–24 s: o M pega o controle, cruza as pernas e liga a TV · 28–30 s: título · 32 s: fim → tela inicial.
+// Roteiro (em 12 s): o cérebro pulsa → a lupa percorre o cérebro → a lupa revela o interior da mente
+// → o M pega o controle, cruza as pernas e liga a TV → título → fim → tela inicial.
 // MP.Intro.iniciar(aoTerminar) é chamado no "Toque para começar" (o toque também libera o som).
 window.MP = window.MP || {};
 
@@ -9,6 +9,18 @@ MP.Intro = (() => {
   const raiz = $('portao'), c = $('ip-cabeca'), ctx = c.getContext('2d');
   const img = new Image(), atorImg = new Image(), quadros = [];
   const DURACAO = 32, BPM = 66, FPS_ATOR = 3;
+  // A intro dura 12 s de verdade. O roteiro original (32 s) é percorrido mais depressa nos trechos de transição;
+  // o M atua em tempo normal (3 quadros/s). Pontos: [segundos reais, segundos do roteiro].
+  const REAL = 12;
+  const MAPA = [[0, 0], [1.2, 4], [3.2, 11], [5.2, 16.5], [5.7, 17], [8.6, 19.9], [10, 28], [11, 30], [12, 32]];
+  function roteiro(r) {
+    for (let i = 1; i < MAPA.length; i++) {
+      const [r0, t0] = MAPA[i - 1], [r1, t1] = MAPA[i];
+      if (r <= r1) return t0 + (t1 - t0) * (r - r0) / (r1 - r0);
+    }
+    return DURACAO;
+  }
+  let real = 0;
   let w = 0, h = 0, dpr = 1, pronto = false, atorPronto = false, rodando = false;
   let tempo = 0, ultimo = 0, batida = 0, soou = -1, anterior = 0, pulso = 0, fim = null, acabou = false;
   let ac = null, nos = [];
@@ -79,8 +91,8 @@ MP.Intro = (() => {
   function quadro(agora) {
     const dt = Math.min((agora - ultimo) / 1000 || 0, .05); ultimo = agora;
     if (rodando && pronto) {
-      tempo += dt; batida += dt * BPM / 60;
-      if (tempo >= DURACAO) { tempo = DURACAO; terminar(); }
+      real += dt; tempo = roteiro(real); batida += dt * BPM / 60;
+      if (real >= REAL) { tempo = DURACAO; terminar(); }
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, w, h);
     const fundo = ctx.createRadialGradient(w / 2, h * .45, 10, w / 2, h * .45, Math.max(w, h) * .65);
@@ -125,7 +137,7 @@ MP.Intro = (() => {
       cena.classList.toggle('ligada', tempo > clique());
       cena.classList.toggle('logo', tempo > clique() + .9);
       animarM(tempo);
-      $('ip-barra').style.width = `${tempo / DURACAO * 100}%`;
+      $('ip-barra').style.width = `${Math.min(1, real / REAL) * 100}%`;
       if (rodando && Math.floor(batida) !== soou) { soou = Math.floor(batida); tom(57, .33, .065, 35); tom(220 * Math.pow(2, (soou % 4) / 12), 1.5, .009); }
     }
     if (!acabou) requestAnimationFrame(quadro);
@@ -156,7 +168,7 @@ MP.Intro = (() => {
       raiz.classList.add('rodando');
       $('ip-pular').hidden = false;
       $('ip-pular').focus({ preventScroll: true });
-      tempo = 0; batida = 0; soou = -1; rodando = true;
+      tempo = 0; real = 0; batida = 0; soou = -1; rodando = true;
     },
   };
 })();
