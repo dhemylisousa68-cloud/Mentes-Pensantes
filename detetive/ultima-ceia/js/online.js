@@ -67,5 +67,5 @@ UC.Online = (() => {
     return 'Algo deu errado: ' + t;
   }
 
-  return { disponivel, conectar, rpc, estado, ouvir, mensagem, get usuario() { return usuario; } };
+  return { disponivel, conectar, rpc, estado, ouvir, mensagem, get usuario() { return usuario; }, get cliente() { return sb; } };
 })();
