@@ -45,8 +45,12 @@ UC.Sala = (() => {
     if (!online || !st) return;
     if (atualizando) { deNovo = true; return; }
     atualizando = true;
+    const g = geracao, feitas = fila.feitas, ocupada = fila.pendentes;
     try {
       const { sala, jogadores } = await UC.Online.estado(st.codigo);
+      // uma escolha minha estava em andamento ou terminou durante esta consulta: a resposta pode ser
+      // antiga; ignora (senão o personagem anterior volta por um instante e a tela pisca)
+      if (ocupada || g !== geracao || feitas !== fila.feitas || fila.pendentes) { if (!fila.pendentes) deNovo = true; return; }
       const eu = UC.Online.usuario;
       if (!sala || !jogadores.some((j) => j.usuario === eu)) {
         // caiu da sala (aba parada por muito tempo): tenta voltar sozinho
@@ -107,10 +111,20 @@ UC.Sala = (() => {
     }
   }
 
-  async function acaoOnline(nome, args) {
-    try { await UC.Online.rpc(nome, { p_codigo: st.codigo, ...args }); }
-    catch (e) { dica(UC.Online.mensagem(e)); }
-    agendarAtualizar();
+  // As ações vão em fila, uma de cada vez e na ordem dos cliques: tocar em A e logo em B termina em B.
+  let geracao = 0;
+  const fila = { pendentes: 0, feitas: 0, ultima: Promise.resolve() };
+  function acaoOnline(nome, args) {
+    geracao++;
+    fila.pendentes++;
+    fila.ultima = fila.ultima.then(async () => {
+      try { await UC.Online.rpc(nome, { p_codigo: st.codigo, ...args }); }
+      catch (e) { dica(UC.Online.mensagem(e)); }
+      fila.pendentes--;
+      fila.feitas++;
+      if (!fila.pendentes) agendarAtualizar();
+    });
+    return fila.ultima;
   }
 
   function novoEstado(convite) {
@@ -154,7 +168,7 @@ UC.Sala = (() => {
     detalhe = id;
     if (dono && !dono.voce) {
       render();
-      raiz.querySelector(`.bola[data-id="${id}"]`)?.classList.add('recusa');
+      brincar(raiz.querySelector(`.bola[data-id="${id}"]`), 'recusa');
       return;
     }
     const j = eu();
@@ -164,7 +178,7 @@ UC.Sala = (() => {
     som('clique');
     salvar();
     render();
-    raiz.querySelector(`.bola[data-id="${id}"]`)?.classList.add('pulo');
+    brincar(raiz.querySelector(`.bola[data-id="${id}"]`), 'pulo');
     if (online) acaoOnline('escolher_personagem', { p_personagem: id });
   }
 
@@ -297,13 +311,15 @@ UC.Sala = (() => {
     const bolas = UC.PERSONAGENS.map((p) => {
       const unidade = UC.unidadeDe(p.id, st.max);
       const dono = donoDaUnidade(unidade);
-      const minha = dono && dono.voce;
-      const classes = ['bola', minha ? 'minha' : '', dono && !minha ? 'ocupada' : '', foco.id === p.id ? 'em-foco' : ''].join(' ');
-      const rotulo = dono ? (minha ? 'Você' : dono.nome) : 'Livre';
-      return `<button class="${classes}" data-id="${p.id}" data-dono="${dono && !minha ? esc(dono.id) : ''}" aria-pressed="${!!minha}" aria-label="${esc(p.nome)}: ${rotulo}">
+      const daUnidade = dono && dono.voce;           // da minha dupla (o escolhido ou o par dele)
+      const minha = daUnidade && dono.personagem === p.id; // só o que eu escolhi fica destacado
+      const meuPar = daUnidade && !minha;
+      const classes = ['bola', minha ? 'minha' : '', meuPar ? 'meu-par' : '', dono && !daUnidade ? 'ocupada' : '', foco.id === p.id ? 'em-foco' : ''].filter(Boolean).join(' ');
+      const rotulo = dono ? (minha ? 'Você' : meuPar ? 'Sua dupla' : dono.nome) : 'Livre';
+      return `<button class="${classes}" data-id="${p.id}" data-dono="${dono && !daUnidade ? esc(dono.id) : ''}" aria-pressed="${!!minha}" aria-label="${esc(p.nome)}: ${rotulo}">
         ${bolaHTML(p)}
         <span class="bola-nome">${esc(p.nome.replace(/^Personagem /, "Nº "))}</span>
-        <span class="bola-dono">${esc(rotulo)}${unidade.includes('+') ? ' · dupla' : ''}</span>
+        <span class="bola-dono">${esc(rotulo)}${unidade.includes('+') && !meuPar ? ' · dupla' : ''}</span>
       </button>`;
     }).join('');
 
@@ -325,9 +341,7 @@ UC.Sala = (() => {
     else if (!todosProntos) dicaTexto = 'Aguardando todos ficarem prontos.';
     else dicaTexto = 'Todos prontos! A porta vai se abrir…';
 
-    // o boneco em foco continua o mesmo elemento entre atualizações (a animação não reinicia)
-    const bonecoAnterior = raiz.querySelector(".palco-boneco");
-    raiz.innerHTML = `
+    const html = `
       <div class="sala-painel">
         <header class="sala-topo">
           <div>
@@ -373,11 +387,52 @@ UC.Sala = (() => {
 
         <a class="sala-sair" href="../../">‹ Sair para o Mentes Pensantes</a>
       </div>`;
-    const bonecoNovo = raiz.querySelector('.palco-boneco');
-    if (bonecoAnterior && bonecoNovo && bonecoAnterior.dataset.id === bonecoNovo.dataset.id) {
-      bonecoNovo.replaceWith(bonecoAnterior);
+    // Atualiza só o que mudou: as fotos e o boneco continuam os mesmos elementos (nada pisca,
+    // a animação não reinicia e o foco do teclado fica onde estava).
+    const painel = raiz.firstElementChild;
+    if (painel && painel.matches('.sala-painel:not(.sala-aviso)')) {
+      const t = document.createElement('template');
+      t.innerHTML = html.trim();
+      mesclar(painel, t.content.firstElementChild);
+    } else {
+      raiz.innerHTML = html;
     }
     animarFolha(raiz.querySelector('.palco-boneco'));
+  }
+
+  // Animações de clique (pulo ao escolher, tremida ao recusar): reinicia e tira a classe quando termina.
+  const TEMPORARIAS = ['pulo', 'recusa'];
+  function brincar(el, classe) {
+    if (!el) return;
+    el.classList.remove(classe);
+    void el.offsetWidth; // força o navegador a recomeçar a animação
+    el.classList.add(classe);
+    el.addEventListener('animationend', () => el.classList.remove(classe), { once: true });
+  }
+
+  // Deixa `velho` igual a `novo` mexendo o mínimo possível no DOM.
+  function mesclar(velho, novo) {
+    if (velho.nodeType !== novo.nodeType || velho.nodeName !== novo.nodeName) { velho.replaceWith(novo); return; }
+    if (velho.nodeType === Node.TEXT_NODE || velho.nodeType === Node.COMMENT_NODE) {
+      if (velho.data !== novo.data) velho.data = novo.data;
+      return;
+    }
+    // o boneco em foco é animado por código: se é o mesmo personagem, fica como está
+    // (outro personagem: troca o boneco inteiro, para a chegada e a animação começarem do zero)
+    if (velho.classList.contains('palco-boneco')) {
+      if (velho.dataset.id !== novo.dataset.id) velho.replaceWith(novo);
+      return;
+    }
+    // o pulinho/recusa de um clique continua até acabar, mesmo se a tela atualizar no meio
+    const efeitos = TEMPORARIAS.filter((c) => velho.classList.contains(c));
+    const classe = [...new Set([...(novo.getAttribute('class') || '').split(/\s+/), ...efeitos])].filter(Boolean).join(' ');
+    if (novo.hasAttribute('class') || efeitos.length) novo.setAttribute('class', classe);
+    for (const a of [...velho.attributes]) if (!novo.hasAttribute(a.name)) velho.removeAttribute(a.name);
+    for (const a of novo.attributes) if (velho.getAttribute(a.name) !== a.value) velho.setAttribute(a.name, a.value);
+    if (velho.disabled !== novo.hasAttribute('disabled') && 'disabled' in velho) velho.disabled = novo.hasAttribute('disabled');
+    const vs = [...velho.childNodes], ns = [...novo.childNodes];
+    ns.forEach((n, i) => { if (vs[i]) mesclar(vs[i], n); else velho.appendChild(n); });
+    for (let i = ns.length; i < vs.length; i++) vs[i].remove();
   }
 
   // ---------- abrir ----------
