@@ -1,0 +1,10 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mentes Pensantes | 5.3 — Revisão de cenário</title><link rel="icon" href="../../../assets/logo.webp"><style>a.voltar{color:#cdbb92;text-decoration:none;font-size:14px}a.voltar:hover{color:#fff}body{background:#17221e;color:#eee4ce;font:16px system-ui;margin:0}main{max-width:900px;margin:auto;padding:20px}canvas{width:100%;image-rendering:pixelated;border:2px solid #927951;border-radius:8px}button,select{padding:10px;background:#38463b;color:white;border:1px solid #a38b62;border-radius:6px}label{display:inline-block;margin:8px}#chars{display:flex;flex-wrap:wrap;gap:6px}#chars button{padding:4px}#chars img{width:64px;height:64px;object-fit:contain}button.sel{outline:2px solid gold}</style><main><a class="voltar" href="../">‹ Voltar à Última Ceia</a><h1>Mentes Pensantes — 5.3 — Revisão de cenário</h1><p>Dia 1 • Colisões e ambientação. Explore a propriedade de Tomás. Aproxime-se dos locais e pressione Espaço.</p><div id="chars"></div><label>Tamanho <input id="size" type="range" min="48" max="120" value="88"></label><label>FPS <input id="fps" type="range" min="4" max="14" value="8"></label><label><input type="checkbox" id="free"> Exploração livre (sem colisões)</label><label><input type="checkbox" id="debug"> Mostrar colisões</label><canvas id="cv" width="960" height="640"></canvas><p>Clique no portão ou use E perto dele · WASD / setas: andar · Shift: correr · E: entrar/sair, sentar/levantar ou pegar/soltar · Espaço: investigar</p><button id="act">Interagir (E)</button> <button onclick="investigate()">Investigar</button> <button id="reset">Reiniciar</button> <span id="msg"></span></main><script src="mapa.js"></script>
+<script>
+// Entra com o personagem escolhido na sala de espera (1 a 10), se houver.
+try {
+  const n = Number(sessionStorage.getItem('uc_personagem_n'));
+  if (n >= 1 && n <= 10) document.querySelectorAll('#chars button')[n - 1]?.click();
+} catch (e) { /* sem escolha: começa no 1 */ }
+</script>
+<script src="../../../js/telacheia.js"></script>
+</html>

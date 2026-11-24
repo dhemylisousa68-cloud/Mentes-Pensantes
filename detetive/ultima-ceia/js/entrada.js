@@ -141,11 +141,12 @@
     await esperar(700);
     if (!s.pulado) concluir();
   }
+  // A porta abriu para todos: entra no mapa principal com o personagem escolhido.
   function mostrarSalao() {
-    const pj = $('#porta-jogo');
-    pj.hidden = false;
-    UC.Som.erro();
-    pj.querySelector('.pj-voltar').focus();
+    const id = UC.Sala.meuPersonagem();
+    const n = UC.PERSONAGENS.findIndex((p) => p.id === id) + 1;
+    try { if (n > 0) sessionStorage.setItem("uc_personagem_n", String(n)); } catch (e) { /* ignora */ }
+    location.href = "mapa/";
   }
   function voltarParaSala() {
     UC.Som.clique();

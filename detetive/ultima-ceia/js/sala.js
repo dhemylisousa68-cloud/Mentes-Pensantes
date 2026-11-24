@@ -455,5 +455,8 @@ UC.Sala = (() => {
   document.addEventListener('pointerdown', (e) => { if (menu && !menu.contains(e.target)) fecharMenu(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menu) { e.stopPropagation(); fecharMenu(); } }, true);
 
-  return { abrir };
+  // personagem escolhido por este jogador (id da vaga), para levar ao mapa
+  const meuPersonagem = () => (st && st.jogadores ? (st.jogadores.find((j) => j.voce) || {}).personagem : null) || null;
+
+  return { abrir, meuPersonagem };
 })();
