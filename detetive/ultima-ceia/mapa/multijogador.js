@@ -167,7 +167,8 @@
       ctx.fillStyle = 'rgba(15,12,10,.45)'; ctx.beginPath(); ctx.ellipse(o.x, o.y, 15, 4, 0, 0, 7); if (!o.seated) ctx.fill();
       if (im && im.complete && im.naturalWidth) {
         const fx = Math.floor(o.phase) % 4 * 128, fy = (o.dir || 0) * 128;
-        if (o.seated) ctx.drawImage(im, fx, fy, 128, 92, o.x - s / 2, o.y - s * .60, s, s * 92 / 128);
+        if (window.Sentar) Sentar.desenhar(o, im, fx, fy, s, o.x, o.y, !!o.seated, o.dir || 0); // senta/levanta com animação
+        else if (o.seated) ctx.drawImage(im, fx, fy, 128, 92, o.x - s / 2, o.y - s * .60, s, s * 92 / 128);
         else ctx.drawImage(im, fx, fy, 128, 128, o.x - s / 2, o.y - s * 120 / 128, s, s);
       }
       // caixa na mão
