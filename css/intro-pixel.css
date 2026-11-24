@@ -1,0 +1,36 @@
+/* Intro de apresentação em pixel art (a partir de Mentes_Pensantes_Pixel_Cadencia.html). */
+#portao.intro-pixel { overflow: hidden; background: #0b0c14; color: #e6d4af; font-family: monospace; }
+#portao.intro-pixel[hidden] { display: none; }
+#ip-cabeca { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+
+/* cena interna (o M liga a TV), revelada pela lupa */
+#ip-cena { position: absolute; inset: 0; pointer-events: none; overflow: hidden; clip-path: circle(0% at 50% 50%); background: #100f0e; }
+#ip-cena svg { display: block; width: 100%; height: 100%; transform-origin: 70.4% 48%; transition: transform 3s ease-in-out; image-rendering: pixelated; }
+#ip-tela, #ip-logo-tv { opacity: 0; transition: opacity .8s; }
+#ip-cena.ligada #ip-tela, #ip-cena.logo #ip-logo-tv { opacity: 1; }
+#ip-chiado { opacity: 0; }
+#ip-cena.ligada:not(.logo) #ip-chiado { animation: ip-chiado .16s infinite alternate; }
+@keyframes ip-chiado { to { opacity: .7; } }
+
+/* título final */
+#ip-titulo {
+  position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; text-align: center; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse, #121613eb, #080a0de8);
+}
+#ip-titulo h1 { margin: 0; font: bold clamp(32px, 6vw, 70px) monospace; letter-spacing: .12em; text-shadow: 4px 4px #6e3758; }
+#ip-titulo p { letter-spacing: 4px; font-size: 11px; color: #d7c799; }
+#ip-barra { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: #c6a970; z-index: 4; }
+
+/* botões */
+.intro-pixel button {
+  background: #24232c; border: 2px solid #8f7955; color: #ecd9b1; border-radius: 0; padding: 11px 16px;
+  font: 13px monospace; letter-spacing: 2px; cursor: pointer;
+}
+.intro-pixel button:hover { background: #3a2a33; }
+.intro-pixel button:focus-visible { outline: 3px solid #d6b978; outline-offset: 3px; }
+.ip-comecar { position: absolute; left: 50%; bottom: 3.5%; transform: translateX(-50%); z-index: 5; padding: 14px 22px !important; animation: ip-convite 2.4s ease-in-out infinite; }
+@keyframes ip-convite { 50% { opacity: .65; } }
+.intro-pixel.rodando .ip-comecar { display: none; }
+.ip-pular { position: absolute; top: 14px; right: 14px; z-index: 5; font-size: 11px !important; padding: 9px 12px !important; }
+.ip-pular[hidden] { display: none; }
+html.reduzido .intro-pixel * { animation: none !important; transition-duration: .001ms !important; }

@@ -12,15 +12,26 @@
   <link rel="preload" as="image" href="assets/cena/fundo.jpg">
   <link rel="preload" as="image" href="assets/mascote/natal.webp">
   <link rel="stylesheet" href="css/hub.css">
+  <link rel="stylesheet" href="css/intro-pixel.css">
 </head>
 <body>
 
-  <!-- ============ PORTÃO (primeiro toque libera o som) ============ -->
-  <section id="portao" class="tela" hidden>
-    <button id="comecar" class="comecar">
-      <span class="comecar-icone" aria-hidden="true">?</span>
-      <span>Toque para começar</span>
-    </button>
+  <!-- ============ INTRO DE APRESENTAÇÃO (pixel art): cabeça → lupa → dentro da mente → M liga a TV → logo ============ -->
+  <section id="portao" class="tela intro-pixel" hidden>
+    <canvas id="ip-cabeca" aria-label="Cabeça gravada com o cérebro pulsando e uma lupa ampliando os detalhes"></canvas>
+    <div id="ip-cena" style="opacity:0">
+      <svg preserveAspectRatio="xMidYMid slice" viewBox="0 0 682.6667 384" aria-label="M pega o controle, cruza as pernas e liga a TV">
+        <defs><pattern id="ip-linhas" width="4" height="4" patternUnits="userSpaceOnUse"><path d="M0 0H4" stroke="#e1d4b6" stroke-width="1"/></pattern></defs>
+        <foreignObject width="682.6667" height="384"><canvas xmlns="http://www.w3.org/1999/xhtml" id="ip-ator" width="683" height="384" style="width:100%;height:100%"></canvas></foreignObject>
+        <rect id="ip-tela" x="416" y="118" width="146" height="122" rx="17" fill="#253a30"/>
+        <rect id="ip-chiado" x="416" y="118" width="146" height="122" rx="17" fill="url(#ip-linhas)"/>
+        <g id="ip-logo-tv" fill="#eddfba" text-anchor="middle"><text x="489" y="162" font-size="14" font-family="monospace" letter-spacing="2">MENTES</text><text x="489" y="184" font-size="16" font-family="monospace">PENSANTES</text><path d="M435 198H543" stroke="#bba575"/><text x="489" y="216" font-size="6" letter-spacing="1">TODO MISTÉRIO COMEÇA AQUI</text></g>
+      </svg>
+    </div>
+    <div id="ip-titulo"><p>TODO MISTÉRIO COMEÇA NA MENTE</p><h1>MENTES<br>PENSANTES</h1></div>
+    <div id="ip-barra"></div>
+    <button id="comecar" class="ip-comecar" type="button"><span>TOQUE PARA COMEÇAR</span></button>
+    <button id="ip-pular" class="ip-pular" type="button" hidden>PULAR INTRO ›</button>
   </section>
 
   <!-- ============ TELA PRINCIPAL: a mansão ============ -->
@@ -135,6 +146,7 @@
   <script src="js/mascote-rig.js"></script>
   <script src="js/neve.js"></script>
   <script src="js/reacao-botao.js"></script>
+  <script src="js/intro-pixel.js"></script>
   <script src="js/hub.js"></script>
   <script src="js/telacheia.js"></script>
 </body>

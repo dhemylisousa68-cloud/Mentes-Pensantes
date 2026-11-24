@@ -545,7 +545,12 @@
   atualizarBotaoSom();
 
   // ---------- Eventos gerais ----------
-  $('#comecar').addEventListener('click', () => { MP.Som.iniciar(); abrirHub(true); });
+  // "Toque para começar": toca a intro de apresentação e, ao terminar (ou pular), entra a tela inicial (mansão)
+  $('#comecar').addEventListener('click', () => {
+    MP.Som.iniciar();
+    if (MP.Intro) MP.Intro.iniciar(() => abrirHub(true));
+    else abrirHub(true);
+  });
   pularSeq.addEventListener('click', pular);
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;

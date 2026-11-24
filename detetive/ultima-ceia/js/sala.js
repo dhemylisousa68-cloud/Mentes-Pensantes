@@ -64,7 +64,8 @@ UC.Sala = (() => {
     } catch (e) {
       const t = String(e && e.message || e);
       if (t.includes('SALA_NAO_EXISTE') || t.includes('SALA_CHEIA') || t.includes('EXPULSO')) {
-        if (t.includes('EXPULSO')) { try { sessionStorage.removeItem('mp_sala'); } catch (err) { /* ignora */ } intervalos.forEach(clearInterval); }
+        intervalos.forEach(clearInterval); online = false; // para de consultar a sala
+        if (t.includes('EXPULSO')) { try { sessionStorage.removeItem('mp_sala'); } catch (err) { /* ignora */ } }
         aviso(UC.Online.mensagem(e), true);
       }
       // falha de rede: tenta de novo no próximo ciclo
