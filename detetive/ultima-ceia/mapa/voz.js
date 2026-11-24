@@ -31,9 +31,44 @@
   const sinal = (para, dados) => M() && M().mandar('voz', { ...dados, para });
   const aviso = (t) => { const m = document.getElementById('msg'); if (m) m.textContent = t; };
 
+  // ---------- qualidade do som ----------
+  // Quem ouve: todas as vozes passam por um limitador (pode aumentar sem estourar) e pelo volume escolhido.
+  const REFORCO = 2.2;               // as vozes chegavam baixas: ganho extra antes do limitador
+  let saida = null, volumeVoz = 1;
+  try { volumeVoz = Math.min(3, Math.max(0, Number(localStorage.getItem('uc_volume_voz') || 1))); } catch (e) { /* ignora */ }
+  function contexto() {
+    if (!actx && (window.AudioContext || window.webkitAudioContext)) {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      const lim = actx.createDynamicsCompressor();
+      lim.threshold.value = -10; lim.knee.value = 6; lim.ratio.value = 12; lim.attack.value = 0.003; lim.release.value = 0.15;
+      saida = actx.createGain(); saida.gain.value = volumeVoz;
+      lim.connect(saida).connect(actx.destination);
+      saida.entrada = lim;
+    }
+    return actx;
+  }
+  // Opus com correção de perdas e mais bits (voz mais limpa)
+  function opus(sdp) {
+    const m = sdp.match(/a=rtpmap:(\d+) opus\/48000/i);
+    if (!m) return sdp;
+    const pt = m[1], extra = 'useinbandfec=1;stereo=0;maxaveragebitrate=64000;cbr=0';
+    return new RegExp(`a=fmtp:${pt} `).test(sdp)
+      ? sdp.replace(new RegExp(`a=fmtp:${pt} ([^\\r\\n]*)`), (l, p) => `a=fmtp:${pt} ${p.split(';').filter((x) => !/^(useinbandfec|stereo|maxaveragebitrate|cbr)=/.test(x)).concat(extra).join(';')}`)
+      : sdp.replace(m[0], `${m[0]}\r\na=fmtp:${pt} ${extra}`);
+  }
+  async function descrever(pc, desc) { await pc.setLocalDescription({ type: desc.type, sdp: opus(desc.sdp) }); }
+  function caprichar(sender) {
+    try {
+      const pr = sender.getParameters();
+      if (!pr.encodings || !pr.encodings.length) pr.encodings = [{}];
+      pr.encodings[0].maxBitrate = 64000;
+      sender.setParameters(pr).catch(() => {});
+    } catch (e) { /* ignora */ }
+  }
+
   // áudio só pode tocar depois de um toque/tecla: destrava na primeira interação
   function destravar() {
-    if (!actx && (window.AudioContext || window.webkitAudioContext)) actx = new (window.AudioContext || window.webkitAudioContext)();
+    contexto();
     if (actx && actx.state === 'suspended') actx.resume();
     for (const p of pares.values()) if (p.audio) p.audio.play().catch(() => {});
   }
@@ -67,7 +102,8 @@
     const tr = p.pc.addTransceiver('audio', { direction: 'sendrecv' });
     p.sender = tr.sender;
     if (mic) await p.sender.replaceTrack(mic);
-    await p.pc.setLocalDescription(await p.pc.createOffer());
+    await descrever(p.pc, await p.pc.createOffer());
+    caprichar(p.sender);
     sinal(id, { tipo: 'sdp', sdp: p.pc.localDescription.toJSON() });
   }
   async function receberSdp(id, sdp) {
@@ -79,7 +115,8 @@
       tr.direction = 'sendrecv';
       p.sender = tr.sender;
       if (mic) await p.sender.replaceTrack(mic);
-      await p.pc.setLocalDescription(await p.pc.createAnswer());
+      await descrever(p.pc, await p.pc.createAnswer());
+      caprichar(p.sender);
       sinal(id, { tipo: 'sdp', sdp: p.pc.localDescription.toJSON() });
     } else if (p && sdp.type === 'answer' && p.pc.signalingState === 'have-local-offer') {
       await p.pc.setRemoteDescription(sdp);
@@ -100,12 +137,14 @@
       document.body.appendChild(p.audio);
     }
     p.audio.srcObject = stream;
-    if (actx || window.AudioContext || window.webkitAudioContext) {
-      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (contexto()) {
       p.audio.muted = true; // o som sai pelo WebAudio; o elemento só mantém o fluxo vivo
       p.fonte = actx.createMediaStreamSource(stream);
+      // tira o ronco grave e o chiado agudo antes de aumentar
+      const grave = actx.createBiquadFilter(); grave.type = 'highpass'; grave.frequency.value = 85;
+      const agudo = actx.createBiquadFilter(); agudo.type = 'lowpass'; agudo.frequency.value = 8000;
       p.ganho = actx.createGain(); p.ganho.gain.value = 0;
-      p.fonte.connect(p.ganho).connect(actx.destination);
+      p.fonte.connect(grave).connect(agudo).connect(p.ganho).connect(saida.entrada);
     }
     p.audio.play().catch(() => {});
   }
@@ -136,18 +175,69 @@
         v = d <= PERTO ? 1 : d >= LONGE ? 0 : Math.pow(1 - (d - PERTO) / (LONGE - PERTO), 1.6);
         if (inside) v = 1; // dentro do hall/garagem todos se ouvem
       }
-      if (p.ganho) p.ganho.gain.setTargetAtTime(v, actx.currentTime, 0.12);
+      if (p.ganho) p.ganho.gain.setTargetAtTime(v * REFORCO, actx.currentTime, 0.12);
       else if (p.audio) p.audio.volume = v;
     }
   }, 150);
+
+  // ---------- microfone tratado antes de enviar ----------
+  // filtro do ronco grave e do chiado → compressor (iguala voz alta e baixa) → ganho → portão de ruído
+  // (o portão fecha quando só tem chiado de fundo entre as palavras)
+  let micBruto = null, portao = null, medidor = null;
+  const PORTAO_DB = -52, SEGURA_MS = 280;
+  function tratar(stream) {
+    if (!contexto() || !actx.createMediaStreamDestination) return null;
+    const fonte = actx.createMediaStreamSource(stream);
+    const grave = actx.createBiquadFilter(); grave.type = 'highpass'; grave.frequency.value = 100;
+    const agudo = actx.createBiquadFilter(); agudo.type = 'lowpass'; agudo.frequency.value = 7600;
+    const comp = actx.createDynamicsCompressor();
+    comp.threshold.value = -30; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = 0.005; comp.release.value = 0.2;
+    const ganho = actx.createGain(); ganho.gain.value = 1.8;
+    portao = actx.createGain(); portao.gain.value = 0;
+    medidor = actx.createAnalyser(); medidor.fftSize = 1024;
+    const destino = actx.createMediaStreamDestination();
+    fonte.connect(grave).connect(agudo);
+    agudo.connect(medidor);
+    agudo.connect(comp).connect(ganho).connect(portao).connect(destino);
+    const buf = new Float32Array(medidor.fftSize);
+    let aberto = false, ultimaVoz = 0;
+    setInterval(() => {
+      if (!segurando) { if (aberto) { aberto = false; portao.gain.setTargetAtTime(0, actx.currentTime, 0.05); } return; }
+      medidor.getFloatTimeDomainData(buf);
+      let soma = 0; for (let i = 0; i < buf.length; i++) soma += buf[i] * buf[i];
+      const db = 10 * Math.log10(soma / buf.length + 1e-12);
+      const agora = performance.now();
+      if (db > PORTAO_DB) ultimaVoz = agora;
+      const abrir = agora - ultimaVoz < SEGURA_MS;
+      if (abrir !== aberto) { aberto = abrir; portao.gain.setTargetAtTime(abrir ? 1 : 0, actx.currentTime, abrir ? 0.01 : 0.08); }
+    }, 20);
+    return destino.stream.getAudioTracks()[0];
+  }
+
+  // volume da voz dos outros (no painel ⚙ Testes)
+  (function controleVolume() {
+    const painel = document.getElementById('painel-teste') || document.querySelector('main');
+    if (!painel) return;
+    const l = document.createElement('label');
+    l.innerHTML = `Volume da voz <input type="range" min="0" max="300" step="10" value="${Math.round(volumeVoz * 100)}"> <output>${Math.round(volumeVoz * 100)}%</output>`;
+    const r = l.querySelector('input'), o = l.querySelector('output');
+    r.addEventListener('input', () => {
+      volumeVoz = Number(r.value) / 100; o.textContent = r.value + '%';
+      if (saida) saida.gain.setTargetAtTime(volumeVoz, actx.currentTime, 0.05);
+      try { localStorage.setItem('uc_volume_voz', String(volumeVoz)); } catch (e) { /* ignora */ }
+    });
+    const ref = painel.querySelector('label');
+    if (ref) ref.before(l); else painel.appendChild(l);
+  })();
 
   // ---------- aperte e segure para falar ----------
   async function pegarMic() {
     if (mic || pedindo) return !!mic;
     pedindo = true;
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-      mic = s.getAudioTracks()[0];
+      const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+      micBruto = s.getAudioTracks()[0];
+      mic = tratar(s) || micBruto;
       mic.enabled = false;
       for (const p of pares.values()) if (p.sender) p.sender.replaceTrack(mic).catch(() => {});
       bt.classList.remove('negado');
@@ -185,6 +275,6 @@
   ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => bt.addEventListener(t, parar));
   bt.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  addEventListener('pagehide', () => { for (const id of [...pares.keys()]) fechar(id); if (mic) mic.stop(); });
-  window.MapaVoz = { pares };
+  addEventListener('pagehide', () => { for (const id of [...pares.keys()]) fechar(id); if (mic) mic.stop(); if (micBruto) micBruto.stop(); });
+  window.MapaVoz = { pares, tratar, get segurando() { return segurando; }, set segurando(v) { segurando = v; } };
 })();
