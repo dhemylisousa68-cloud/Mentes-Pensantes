@@ -141,11 +141,12 @@
     cachePeca.set(it.id, r); return r;
   }
   // gira 90° no sentido horário, r vezes (sprite, colisores, luzes e animações)
-  const cacheRot = new Map();
-  function girada(it, r) {
-    const k = it.id + '|' + r;
-    if (cacheRot.has(k)) return cacheRot.get(k);
-    let s = render(it);
+  const cacheRot = new WeakMap();
+  const girada = (it, r) => girar(render(it), r);
+  function girar(base, r) {
+    let m = cacheRot.get(base); if (!m) { m = []; cacheRot.set(base, m); }
+    if (m[r]) return m[r];
+    let s = base;
     for (let i = 0; i < r; i++) {
       const c = document.createElement('canvas'); c.width = s.h; c.height = s.w;
       const g = c.getContext('2d'); g.translate(s.h, 0); g.rotate(Math.PI / 2); g.drawImage(s.can, 0, 0);
@@ -157,7 +158,7 @@
         anims: s.anims.map((a) => ({ ...a, x: H - a.y, y: a.x })),
       };
     }
-    cacheRot.set(k, s); return s;
+    return (m[r] = s);
   }
   function spriteCorpo(it, r) {
     const tipo = Array.isArray(it.corpo) ? it.corpo[r % it.corpo.length] : it.corpo;
@@ -165,25 +166,57 @@
   }
 
   // ---------- aplicar no andar ----------
+  // A.orig: móveis originais do andar (separados pelo interior.js). dados.andares[n].orig guarda o que mudou
+  // neles: { o12: { x, y, r } } (movido/girado, x/y = centro) ou { o12: { del: true } } (excluído).
+  const ehMovendo = (ref) => movendo && movendo.ref && ((ref.orig && movendo.ref.orig === ref.orig) || (ref.item !== undefined && movendo.ref.item === ref.item));
+  function poe(A, s, x0, y0, camada, ref) {
+    for (const [fx, fy, fw, fh] of s.fixos) A.fixos.push([x0 + fx, y0 + fy, fw, fh]);
+    for (const l of s.luzes) A.luzes.push({ ...l, x: x0 + l.x, y: y0 + l.y });
+    for (const a of s.anims) A.anims.push({ ...a, x: x0 + a.x, y: y0 + a.y });
+    A.decor.push({ can: s.can, x0, y0, w: s.w, h: s.h, camada, ref });
+  }
   function aplicar(A) {
     const n = A.nivel, b = A.base; if (!b) return;
     A.fixos = b.fixos.slice(); A.luzes = b.luzes.slice(); A.anims = b.anims.slice();
     A.corpos = b.corpos.slice(); A.assentosFixos = b.assentos.slice(); A.decor = [];
-    const itens = (dados.andares[n] && dados.andares[n].itens) || [];
+    const ad = dados.andares[n] || {}, mods = ad.orig || {};
+    if (!ad.vazio) for (const e of A.orig || []) {
+      const m = mods[e.id], ref = { orig: e.id };
+      if ((m && m.del) || ehMovendo(ref)) continue;
+      if (e.tipo === 'corpo') {
+        const t = Interior.TIPOS[e.tipoCorpo];
+        const x = m ? Math.round(m.x - t.w / 2) : e.x, y = m ? Math.round(m.y - t.h / 2) : e.y;
+        const c = Interior.D(A, e.tipoCorpo, x, y, e.v); c.id = `${n}:${e.id}`; c.ref = ref; continue;
+      }
+      const s = girar(e, m ? m.r || 0 : 0);
+      poe(A, s, m ? Math.round(m.x - s.w / 2) : e.x0, m ? Math.round(m.y - s.h / 2) : e.y0, e.camada, ref);
+    }
+    const itens = ad.itens || [];
     itens.forEach((p, idx) => {
-      const it = CAT.get(p.t); if (!it) return;
+      const it = CAT.get(p.t), ref = { item: idx }; if (!it || ehMovendo(ref)) return;
       if (it.corpo) {
         const { tipo, t } = spriteCorpo(it, p.r || 0);
         const c = Interior.D(A, tipo, Math.round(p.x - t.w / 2), Math.round(p.y - t.h / 2), it.v);
-        c.id = `${n}:d${idx}`; return;
+        c.id = `${n}:d${idx}`; c.ref = ref; return;
       }
-      const s = girada(it, p.r || 0), x0 = Math.round(p.x - s.w / 2), y0 = Math.round(p.y - s.h / 2);
-      for (const [fx, fy, fw, fh] of s.fixos) A.fixos.push([x0 + fx, y0 + fy, fw, fh]);
-      for (const l of s.luzes) A.luzes.push({ ...l, x: x0 + l.x, y: y0 + l.y });
-      for (const a of s.anims) A.anims.push({ ...a, x: x0 + a.x, y: y0 + a.y });
-      A.decor.push({ can: s.can, x0, y0, w: s.w, h: s.h, camada: it.camada ?? 1, idx });
+      const s = girada(it, p.r || 0);
+      poe(A, s, Math.round(p.x - s.w / 2), Math.round(p.y - s.h / 2), it.camada ?? 1, ref);
     });
     A.decor.sort((a, b2) => a.camada - b2.camada || (a.y0 + a.h) - (b2.y0 + b2.h));
+  }
+  // o que está embaixo do mouse (objetos com física primeiro, depois móveis, tapetes por último)
+  function acharEmbaixo(A, wx, wy) {
+    const nx = wx / K, ny = wy / K;
+    for (const c of A.corpos) {
+      if (!c.ref) continue;
+      const t = Interior.TIPOS[c.tipo], sx = c.x - t.w * K / 2, sy = c.y + c.h / 2 - t.h * K - c.z;
+      if (wx >= sx - 4 && wx <= sx + t.w * K + 4 && wy >= sy - 4 && wy <= sy + t.h * K + 4) return { ref: c.ref, corpo: c };
+    }
+    for (const camada of [1, 0]) for (let i = (A.decor || []).length - 1; i >= 0; i--) {
+      const d = A.decor[i]; if (d.camada !== camada || !d.ref) continue;
+      if (nx >= d.x0 && nx < d.x0 + d.w && ny >= d.y0 && ny < d.y0 + d.h) return { ref: d.ref, decor: d };
+    }
+    return null;
   }
   function desenhar(A, g) {
     if (!A.decor) return;
@@ -319,16 +352,72 @@
   }
   function avisoTela(t) { const el = document.getElementById('inv-toast'); if (!el) return; el.textContent = t; el.style.display = 'block'; clearTimeout(avisoTela.t); avisoTela.t = setTimeout(() => { el.style.display = 'none'; }, 3500); }
 
+  // ---------- pegar um item do mapa (botão direito), mover, girar, soltar ou excluir ----------
+  let movendo = null; // { ref: {orig}|{item}|{pista}, tipo: 'peca'|'corpo'|'item'|'pista', base, corpo, it }
+  const menu = document.createElement('div');
+  menu.style.cssText = 'position:fixed;z-index:43;display:none;gap:6px;padding:6px;background:rgba(20,14,10,.92);border:1px solid #b08a3e;border-radius:8px;font:13px system-ui';
+  menu.innerHTML = '<button data-a="excluir">🗑 Excluir (Delete)</button><button data-a="cancelar">✕ Cancelar (Esc)</button>';
+  menu.querySelectorAll('button').forEach((b) => { b.style.cssText = 'padding:6px 9px;background:#3a3028;color:#f0e2c0;border:1px solid #8c7552;border-radius:6px;cursor:pointer;font:13px system-ui'; });
+  menu.onclick = (e) => { const a = e.target.closest('button')?.dataset.a; if (a === 'excluir') excluir(); if (a === 'cancelar') cancelar(); };
+  document.body.append(menu);
+
+  function pegarDoMapa(m, ev) {
+    const A = Interior.andarDe(Interior.nivel), n = A.nivel;
+    // pista (marcador amarelo)
+    for (const p of ((window.Investigacao && Investigacao.PONTOS) || [])) {
+      const o = dados.pistas[p.id] || p; if ((o.andar ?? p.andar) !== n) continue;
+      if (Math.hypot(o.x - m.wx, o.y - m.wy) < 24) { movendo = { ref: { pista: p.id }, tipo: 'pista' }; mostrarMenu(ev); return; }
+    }
+    const achado = acharEmbaixo(A, m.wx, m.wy);
+    if (!achado) { msg.textContent = 'Nada para pegar aqui.'; return; }
+    const ref = achado.ref, ad = andarDados(n);
+    if (ref.orig) {
+      const e = (A.orig || []).find((o) => o.id === ref.orig), mod = (ad.orig || {})[ref.orig];
+      if (!e) return;
+      movendo = e.tipo === 'corpo' ? { ref, tipo: 'corpo', corpo: { tipo: e.tipoCorpo, v: e.v } } : { ref, tipo: 'peca', base: e, camada: e.camada };
+      rot = mod && mod.r ? mod.r : 0;
+    } else {
+      const p = ad.itens[ref.item], it = p && CAT.get(p.t); if (!it) return;
+      movendo = { ref, tipo: 'item', it }; rot = p.r || 0;
+    }
+    aplicar(A); mostrarMenu(ev);
+  }
+  function mostrarMenu(ev) {
+    menu.style.display = 'flex';
+    menu.style.left = Math.min(innerWidth - 300, ev.clientX + 14) + 'px';
+    menu.style.top = Math.min(innerHeight - 50, ev.clientY + 14) + 'px';
+  }
+  function fimMovendo() { movendo = null; menu.style.display = 'none'; rot = 0; aplicar(Interior.andarDe(Interior.nivel)); }
+  function soltar(m) {
+    const n = Interior.nivel, ad = andarDados(n), ref = movendo.ref;
+    desfazer.push(JSON.stringify(dados)); if (desfazer.length > 60) desfazer.shift();
+    if (ref.pista) dados.pistas[ref.pista] = { andar: n, x: Math.round(m.wx), y: Math.round(m.wy) };
+    else if (ref.orig) { ad.orig = ad.orig || {}; ad.orig[ref.orig] = { x: m.nx, y: m.ny, r: rot }; }
+    else { const p = ad.itens[ref.item]; if (p) Object.assign(p, { x: m.nx, y: m.ny, r: rot }); }
+    salvar(); fimMovendo();
+  }
+  function excluir() {
+    if (!movendo) return;
+    const n = Interior.nivel, ad = andarDados(n), ref = movendo.ref;
+    desfazer.push(JSON.stringify(dados));
+    if (ref.pista) delete dados.pistas[ref.pista];          // a pista volta ao lugar original
+    else if (ref.orig) { ad.orig = ad.orig || {}; ad.orig[ref.orig] = { del: true }; }
+    else ad.itens.splice(ref.item, 1);
+    salvar(); fimMovendo(); msg.textContent = ref.pista ? 'Pista voltou ao lugar original.' : 'Item excluído (Ctrl+Z desfaz).';
+  }
+  function cancelar() { if (movendo) fimMovendo(); }
+
   addEventListener('keydown', (e) => {
     if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
     const k = e.key.toLowerCase();
     if (k === 'p') { e.preventDefault(); alternar(); return; }
     if (!editavel || !modo) return;
-    if (k === 'escape') { e.preventDefault(); e.stopPropagation(); if (aberto) abrir(false); else ligar(false); return; }
+    if (k === 'escape') { e.preventDefault(); e.stopPropagation(); if (movendo) cancelar(); else if (aberto) abrir(false); else ligar(false); return; }
     if (aberto) { if (!['p', 'escape'].includes(k)) e.stopPropagation(); return; } // com o inventário aberto, as teclas não andam
-    if (/^[1-9]$/.test(e.key)) { sel = +e.key - 1; montarHot(); return; }
+    if ((k === 'delete' || k === 'backspace' || k === 'x') && movendo) { e.preventDefault(); e.stopPropagation(); excluir(); return; }
+    if (/^[1-9]$/.test(e.key)) { cancelar(); sel = +e.key - 1; montarHot(); return; }
     if (k === 'r') { rot = (rot + 1) % 4; return; }
-    if (k === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); voltar(); }
+    if (k === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); cancelar(); voltar(); }
   }, true);
 
   function voltar() {
@@ -348,27 +437,21 @@
   cv.addEventListener('mousedown', (e) => {
     if (!modo || aberto || !inside) return;
     const m = posMouse(e), n = Interior.nivel;
-    if (e.button === 2) { remover(m, n); return; }
+    if (e.button === 2) { if (movendo) cancelar(); pegarDoMapa(m, e); return; }
     if (e.button !== 0) return;
-    const id = hotbar[sel], it = id && item(id); if (!it) { msg.textContent = 'Escolha um item na barra (P abre o inventário).'; return; }
+    if (movendo) { soltar(m); return; }
+    const id = hotbar[sel], it = id && item(id); if (!it) { msg.textContent = 'Escolha um item na barra (P abre o inventário) ou clique com o botão direito num móvel.'; return; }
     desfazer.push(JSON.stringify(dados)); if (desfazer.length > 60) desfazer.shift();
     if (it.pista) { dados.pistas[it.pista] = { andar: n, x: Math.round(m.wx), y: Math.round(m.wy) }; salvar(); return; }
     andarDados(n).itens.push({ t: it.id, x: m.nx, y: m.ny, r: rot });
     salvar(); aplicar(Interior.andarDe(n));
   });
-  function remover(m, n) {
-    // pista mais perto
-    for (const [id, p] of Object.entries(dados.pistas)) if (p.andar === n && Math.hypot(p.x - m.wx, p.y - m.wy) < 30) { desfazer.push(JSON.stringify(dados)); delete dados.pistas[id]; salvar(); return; }
-    const itens = andarDados(n).itens;
-    for (let i = itens.length - 1; i >= 0; i--) {
-      const p = itens[i], it = CAT.get(p.t); if (!it) continue;
-      let w, h;
-      if (it.corpo) { const t = spriteCorpo(it, p.r || 0).t; w = t.w; h = t.h; } else { const s = girada(it, p.r || 0); w = s.w; h = s.h; }
-      if (Math.abs(m.wx / K - p.x) <= w / 2 && Math.abs(m.wy / K - p.y) <= h / 2) {
-        desfazer.push(JSON.stringify(dados)); itens.splice(i, 1); salvar(); aplicar(Interior.andarDe(n)); return;
-      }
-    }
-  }
+  const restaurar = document.createElement('button'); restaurar.textContent = 'Restaurar móveis originais';
+  restaurar.onclick = () => {
+    const n = Interior.nivel; if (!confirm('Devolver os móveis originais deste andar ao lugar de antes?')) return;
+    desfazer.push(JSON.stringify(dados)); delete andarDados(n).orig; salvar(); aplicar(Interior.andarDe(n));
+  };
+  inv.querySelector('.limpar').before(restaurar);
 
   // sombra do item (verde = cabe, vermelha = bate em parede)
   const cacheSombra = new Map();
@@ -385,25 +468,49 @@
     }
     return true;
   }
+  // o que vai na mão: item da barra ou o item pego do mapa
+  function naMao() {
+    if (movendo) {
+      if (movendo.tipo === 'pista') return { pista: true, nome: 'Pista ' + movendo.ref.pista };
+      if (movendo.tipo === 'peca') return { base: movendo.base, nome: 'Móvel', parede: movendo.base.camada === 0 || !movendo.base.fixos.length };
+      if (movendo.tipo === 'corpo') return { corpoTipo: movendo.corpo, nome: 'Objeto' };
+      return { ...movendo.it, item: movendo.it };
+    }
+    const id = hotbar[sel], it = id && item(id);
+    return it ? { ...it, item: it } : null;
+  }
   function desenharFrente(A, g, vx, vy) {
     if (!modo) return;
     // pistas do andar sempre visíveis no modo decoração
     g.save(); g.font = '12px system-ui'; g.textAlign = 'center';
     for (const p of ((window.Investigacao && Investigacao.PONTOS) || [])) {
+      if (movendo && movendo.ref.pista === p.id) continue;
       const o = dados.pistas[p.id] || p; if ((o.andar ?? p.andar) !== A.nivel) continue;
       g.fillStyle = 'rgba(255,215,112,.9)'; g.beginPath(); g.moveTo(o.x, o.y - 12); g.lineTo(o.x + 7, o.y); g.lineTo(o.x, o.y + 12); g.lineTo(o.x - 7, o.y); g.closePath(); g.fill();
       g.fillStyle = 'rgba(20,14,10,.75)'; const w = g.measureText(p.id).width + 8; g.fillRect(o.x - w / 2, o.y + 14, w, 16); g.fillStyle = '#ffd770'; g.fillText(p.id, o.x, o.y + 26);
     }
     g.restore();
     if (!mouse || aberto) return;
-    const id = hotbar[sel], it = id && item(id);
+    const mao = naMao();
+    // sem nada na mão: contorno amarelo no que dá para pegar com o botão direito
+    if (!movendo) {
+      const em = acharEmbaixo(A, mouse.wx, mouse.wy);
+      if (em && (!mao || em)) {
+        g.save(); g.strokeStyle = '#ffd770'; g.lineWidth = 2; g.setLineDash([6, 4]);
+        if (em.decor) g.strokeRect(em.decor.x0 * K - 2, em.decor.y0 * K - 2, em.decor.w * K + 4, em.decor.h * K + 4);
+        else { const c = em.corpo, t = Interior.TIPOS[c.tipo]; g.strokeRect(c.x - t.w * K / 2 - 2, c.y + c.h / 2 - t.h * K - c.z - 2, t.w * K + 4, t.h * K + 4); }
+        g.restore();
+      }
+    }
     g.save(); g.imageSmoothingEnabled = false;
-    if (it && it.pista) {
+    if (mao && mao.pista) {
       g.globalAlpha = .7; g.fillStyle = '#8fff9a'; g.beginPath(); g.moveTo(mouse.wx, mouse.wy - 14); g.lineTo(mouse.wx + 8, mouse.wy); g.lineTo(mouse.wx, mouse.wy + 14); g.lineTo(mouse.wx - 8, mouse.wy); g.closePath(); g.fill();
-    } else if (it) {
-      let can, w, h, fixos = [], parede = !!it.parede;
-      if (it.corpo) { const s = spriteCorpo(it, rot); can = s.can; w = s.t.w; h = s.t.h; fixos = [[0, h - s.t.fh, w, s.t.fh]]; }
-      else { const s = girada(it, rot); can = s.can; w = s.w; h = s.h; fixos = s.fixos; }
+    } else if (mao) {
+      let can, w, h, fixos = [], parede = !!mao.parede;
+      if (mao.base) { const s = girar(mao.base, rot); can = s.can; w = s.w; h = s.h; fixos = s.fixos; }
+      else if (mao.corpoTipo) { can = Interior.sprite(mao.corpoTipo.tipo, mao.corpoTipo.v); const t = Interior.TIPOS[mao.corpoTipo.tipo]; w = t.w; h = t.h; fixos = [[0, h - t.fh, w, t.fh]]; }
+      else if (mao.item.corpo) { const s = spriteCorpo(mao.item, rot); can = s.can; w = s.t.w; h = s.t.h; fixos = [[0, h - s.t.fh, w, s.t.fh]]; }
+      else { const s = girada(mao.item, rot); can = s.can; w = s.w; h = s.h; fixos = s.fixos; }
       const x0 = Math.round(mouse.nx - w / 2), y0 = Math.round(mouse.ny - h / 2);
       const ok = parede || cabe(A, fixos, x0, y0);
       g.globalAlpha = .62;
@@ -414,7 +521,9 @@
     g.restore();
     // dica perto do cursor
     g.save(); g.font = '12px system-ui'; g.textAlign = 'left';
-    const t = it ? `${it.nome} · scroll/R gira · clique coloca · direito remove` : 'Barra vazia: P abre o inventário';
+    const t = movendo ? 'Clique: soltar aqui · scroll/R gira · Delete exclui · Esc cancela'
+      : mao ? `${mao.nome} · clique coloca · scroll/R gira · botão direito pega um móvel do mapa`
+        : 'Botão direito: pegar um móvel do mapa · P abre o inventário';
     const w2 = g.measureText(t).width + 12; g.fillStyle = 'rgba(20,14,10,.8)'; g.fillRect(mouse.wx + 16, mouse.wy + 16, w2, 20);
     g.fillStyle = '#f0e2c0'; g.fillText(t, mouse.wx + 22, mouse.wy + 30); g.restore();
   }

@@ -196,14 +196,19 @@
     for (const [px, py, pw, ph] of [...PORTAS, ...def.extras]) {
       if (ph >= 2 && pw >= 1 && py + ph < GH - 2) { P(px * T - 2, py * T, 2, ph * T, '#3a2516'); P((px + pw) * T, py * T, 2, ph * T, '#3a2516'); }
     }
-    // escadas e elevador
-    if (def.sobe) escada(A, SOBE, true); else { A.fixos.push(SOBE); P(...SOBE, '#120d0a'); box(SOBE[0] + 4, SOBE[1] + 8, 40, 64, '#3a2a1e'); }
-    if (def.desce) escada(A, DESCE, false); else { A.fixos.push(DESCE); bancadaSimples(DESCE[0] + 2, DESCE[1] + 10, 44, '#5a4a3a'); }
+    // só o elevador liga os andares (sem escadas)
     elevador(A);
-    A.escadas = { sobe: def.sobe ? SOBE : null, desce: def.desce ? DESCE : null };
+    A.escadas = { sobe: null, desce: null };
 
-    // móveis originais (a decoração pode pedir o andar vazio para montar tudo à mão)
-    if (!(window.Decoracao && Decoracao.vazio(nivel))) MOBILIA[nivel](A, salas);
+    // móveis originais: cada um vira uma peça separada (dá para mover ou excluir no modo decoração).
+    // "Andar vazio" na decoração pula todos eles.
+    const gravados = [];
+    if (!(window.Decoracao && Decoracao.vazio(nivel))) {
+      L = new Proxy({}, { get: (_, nome) => (...args) => { gravados.push({ nome, args }); } });
+      try { MOBILIA[nivel](A, salas); } finally { L = LIB; }
+    }
+    A.orig = separar(A, gravados);
+    G = tela.getContext('2d');
     A.tela = tela;
     A.base = { fixos: A.fixos.slice(), luzes: A.luzes.slice(), anims: A.anims.slice(), corpos: A.corpos.slice(), assentos: (A.assentosFixos || []).slice() };
     G = null;
@@ -400,179 +405,258 @@
     A.corpos.push(c); return c;
   }
 
+  // ---------- móveis originais como peças separadas ----------
+  // A mobília chama tudo por L.*: na construção, L só anota as chamadas; depois cada móvel vira um sprite
+  // com seus colisores, luzes e animações. Pixels soltos dentro de um móvel (pratos na mesa…) vão junto dele;
+  // os que sobram e as portas da casa ficam pintados no chão.
+  const LIB = {
+    P: (...a) => P(...a), box: (...a) => box(...a), D: (...a) => D(...a),
+    mesa, cama, criado, armario, estante, prateleira, bancada, bancadaSimples, aparador, fogao, lareira, sofa, piano, relogio,
+    escrivaninha, vasoFixo, pia, sanitario, banheira, espelho, carro, caldeira, canos, mesaBilhar, telescopio, cofre, bau, banco,
+    castical, arandela, janela, quadro, tapete, porta, portaoGaragem, vela,
+  };
+  let L = LIB;
+  const FIXAS = new Set(['porta', 'portaoGaragem']), SOLTOS = new Set(['P', 'box']);
+  let rascunho = null;
+  function separar(A, lista) {
+    const tela = G;
+    if (!rascunho) { rascunho = document.createElement('canvas'); rascunho.width = NW; rascunho.height = NH; }
+    const rg = rascunho.getContext('2d', { willReadFrequently: true });
+    const info = lista.map((r, i) => ({ ...r, i }));
+    const desenha = (r, A2) => { LIB[r.nome](...r.args.map((v) => (v === A ? A2 : v))); };
+    function caixa(rs) {
+      const A2 = { fixos: [], luzes: [], anims: [], nivel: A.nivel };
+      let rx0 = NW, ry0 = NH, rx1 = 0, ry1 = 0;
+      for (const r of rs) {
+        const n = r.args.filter((v) => typeof v === 'number'), x = n[0] || 0, y = n[1] || 0;
+        rx0 = Math.min(rx0, x - 48); ry0 = Math.min(ry0, y - 48);
+        rx1 = Math.max(rx1, x + Math.max(176, (n[2] || 0) + 60)); ry1 = Math.max(ry1, y + Math.max(120, (n[3] || 0) + 60));
+      }
+      rx0 = Math.max(0, Math.floor(rx0)); ry0 = Math.max(0, Math.floor(ry0)); rx1 = Math.min(NW, Math.ceil(rx1)); ry1 = Math.min(NH, Math.ceil(ry1));
+      const W = rx1 - rx0, H = ry1 - ry0; if (W <= 0 || H <= 0) return null;
+      rg.clearRect(rx0, ry0, W, H);
+      comG(rg, () => { for (const r of rs) desenha(r, A2); });
+      const d = rg.getImageData(rx0, ry0, W, H).data;
+      let x0 = W, y0 = H, x1 = -1, y1 = -1;
+      for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) if (d[(yy * W + xx) * 4 + 3]) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
+      if (x1 < 0) return null;
+      return { x0: rx0 + x0, y0: ry0 + y0, w: x1 - x0 + 1, h: y1 - y0 + 1, A2 };
+    }
+    // 1) tamanho de cada coisa
+    for (const r of info) {
+      if (r.nome === 'D' || FIXAS.has(r.nome)) continue;
+      if (SOLTOS.has(r.nome)) { const [x, y, w, h] = r.args; r.bb = { x0: x, y0: y, w, h }; continue; }
+      const c = caixa([r]); if (c) { r.bb = c; r.peca = true; }
+    }
+    // 2) o que está dentro de um móvel maior desenhado antes vai junto dele (tapete não carrega nada)
+    const area = (b) => b.w * b.h;
+    for (const r of info) {
+      if (!r.bb) continue;
+      const cx = r.bb.x0 + r.bb.w / 2, cy = r.bb.y0 + r.bb.h / 2;
+      let pai = null;
+      for (const q of info) {
+        if (q.i >= r.i) break;
+        if (!q.peca || q.nome === 'tapete') continue;
+        const b = q.bb;
+        if (cx >= b.x0 && cx < b.x0 + b.w && cy >= b.y0 && cy < b.y0 + b.h && area(b) > 2 * area(r.bb) && (!pai || area(b) < area(pai.bb))) pai = q;
+      }
+      if (pai) { while (pai.pai) pai = pai.pai; r.pai = pai; (pai.filhos || (pai.filhos = [])).push(r); }
+    }
+    // 3) pixels soltos que não são de nenhum móvel e as portas da casa: pintados no chão
+    G = tela;
+    for (const r of info) if ((SOLTOS.has(r.nome) && !r.pai) || FIXAS.has(r.nome)) desenha(r, A);
+    // 4) cada móvel (com o que leva junto) vira uma peça
+    const elems = [];
+    for (const r of info) {
+      if (!r.peca || r.pai) continue;
+      const c = caixa([r, ...(r.filhos || [])].sort((a, b) => a.i - b.i)); if (!c) continue;
+      const can = document.createElement('canvas'); can.width = c.w; can.height = c.h;
+      can.getContext('2d').drawImage(rascunho, c.x0, c.y0, c.w, c.h, 0, 0, c.w, c.h);
+      elems.push({
+        id: 'o' + r.i, tipo: 'peca', nome: r.nome, can, x0: c.x0, y0: c.y0, w: c.w, h: c.h, camada: r.nome === 'tapete' ? 0 : 1,
+        fixos: c.A2.fixos.map(([x, y, w, h]) => [x - c.x0, y - c.y0, w, h]),
+        luzes: c.A2.luzes.map((l) => ({ ...l, x: l.x - c.x0, y: l.y - c.y0 })),
+        anims: c.A2.anims.map((a) => ({ ...a, x: a.x - c.x0, y: a.y - c.y0 })),
+      });
+    }
+    for (const r of info) if (r.nome === 'D') elems.push({ id: 'o' + r.i, tipo: 'corpo', tipoCorpo: r.args[1], x: r.args[2], y: r.args[3], v: r.args[4] });
+    G = tela;
+    return elems;
+  }
+
   // ---------- mobília de cada andar ----------
   const MOBILIA = {
     0(A) {
       // Cozinha
-      fogao(A, 22, 40); bancada(A, 60, 42, 112); pia(A, 120, 42);
-      prateleira(64, 18, 50); prateleira(122, 18, 46); P(30, 20, 2, 8, '#5a7a3a'); P(36, 20, 2, 7, '#7a9a4a');
-      mesa(A, 72, 118, 52, 22, '#8a5a34'); P(78, 122, 8, 5, '#c89458'); P(92, 121, 6, 6, '#b83a2a'); P(104, 123, 10, 4, '#d8c088');
-      D(A, 'banqueta', 80, 144); D(A, 'banqueta', 104, 144);
-      D(A, 'barril', 20, 196); D(A, 'barril', 34, 200); D(A, 'barril', 22, 214);
-      D(A, 'caixote', 160, 198); D(A, 'caixote', 166, 214);
-      D(A, 'garrafa', 150, 150); D(A, 'fruta', 132, 176); D(A, 'fruta', 140, 182, '#d8a020'); D(A, 'balde', 40, 150);
+      L.fogao(A, 22, 40); L.bancada(A, 60, 42, 112); L.pia(A, 120, 42);
+      L.prateleira(64, 18, 50); L.prateleira(122, 18, 46); L.P(30, 20, 2, 8, '#5a7a3a'); L.P(36, 20, 2, 7, '#7a9a4a');
+      L.mesa(A, 72, 118, 52, 22, '#8a5a34'); L.P(78, 122, 8, 5, '#c89458'); L.P(92, 121, 6, 6, '#b83a2a'); L.P(104, 123, 10, 4, '#d8c088');
+      L.D(A, 'banqueta', 80, 144); L.D(A, 'banqueta', 104, 144);
+      L.D(A, 'barril', 20, 196); L.D(A, 'barril', 34, 200); L.D(A, 'barril', 22, 214);
+      L.D(A, 'caixote', 160, 198); L.D(A, 'caixote', 166, 214);
+      L.D(A, 'garrafa', 150, 150); L.D(A, 'fruta', 132, 176); L.D(A, 'fruta', 140, 182, '#d8a020'); L.D(A, 'balde', 40, 150);
       // Salão de jantar
-      for (const jx of [226, 286, 470, 530]) janela(jx, 18);
-      quadro(364, 17, 40, 24, 1);
-      for (const ax of [258, 328, 436, 506]) arandela(A, ax, 24);
-      tapete(268, 100, 232, 104, '#6e1f26');
-      mesa(A, 304, 128, 160, 32, '#5a3620');
-      P(307, 131, 154, 24, '#e8e0cc'); P(307, 141, 154, 4, '#8a2a30');
-      for (const px of [316, 348, 380, 412, 444]) { P(px, 133, 7, 5, '#f4f0e6'); P(px + 2, 134, 3, 2, '#b86a3a'); P(px, 148, 7, 5, '#f4f0e6'); P(px + 2, 149, 3, 2, '#7a9a4a'); P(px + 8, 134, 2, 3, '#c9d6e0'); P(px + 8, 148, 2, 3, '#c9d6e0'); }
-      for (const cx of [336, 432]) { P(cx - 3, 141, 8, 3, '#d0a850'); vela(A, cx - 3, 137); vela(A, cx + 3, 137); vela(A, cx, 135); }
-      for (const cx of [320, 352, 384, 416, 448]) { D(A, 'cadeiraC', cx - 5, 113); D(A, 'cadeiraB', cx - 5, 158); }
-      D(A, 'cadeiraL', 290, 138);
-      castical(A, 256, 84); castical(A, 504, 84); castical(A, 256, 196); castical(A, 504, 196);
-      aparador(A, 230, 46, 44); aparador(A, 494, 46, 44);
-      D(A, 'vaso', 212, 218); D(A, 'vaso', 544, 218);
+      for (const jx of [226, 286, 470, 530]) L.janela(jx, 18);
+      L.quadro(364, 17, 40, 24, 1);
+      for (const ax of [258, 328, 436, 506]) L.arandela(A, ax, 24);
+      L.tapete(268, 100, 232, 104, '#6e1f26');
+      L.mesa(A, 304, 128, 160, 32, '#5a3620');
+      L.P(307, 131, 154, 24, '#e8e0cc'); L.P(307, 141, 154, 4, '#8a2a30');
+      for (const px of [316, 348, 380, 412, 444]) { L.P(px, 133, 7, 5, '#f4f0e6'); L.P(px + 2, 134, 3, 2, '#b86a3a'); L.P(px, 148, 7, 5, '#f4f0e6'); L.P(px + 2, 149, 3, 2, '#7a9a4a'); L.P(px + 8, 134, 2, 3, '#c9d6e0'); L.P(px + 8, 148, 2, 3, '#c9d6e0'); }
+      for (const cx of [336, 432]) { L.P(cx - 3, 141, 8, 3, '#d0a850'); L.vela(A, cx - 3, 137); L.vela(A, cx + 3, 137); L.vela(A, cx, 135); }
+      for (const cx of [320, 352, 384, 416, 448]) { L.D(A, 'cadeiraC', cx - 5, 113); L.D(A, 'cadeiraB', cx - 5, 158); }
+      L.D(A, 'cadeiraL', 290, 138);
+      L.castical(A, 256, 84); L.castical(A, 504, 84); L.castical(A, 256, 196); L.castical(A, 504, 196);
+      L.aparador(A, 230, 46, 44); L.aparador(A, 494, 46, 44);
+      L.D(A, 'vaso', 212, 218); L.D(A, 'vaso', 544, 218);
       // Biblioteca
-      estante(A, 580, 12, 50, 40); estante(A, 696, 12, 52, 40); janela(650, 18, 14, 12, '#2a4a2a');
-      tapete(604, 140, 116, 72, '#2a4a32', '#b08a3e');
-      escrivaninha(A, 636, 104, 52); D(A, 'cadeiraB', 657, 122);
-      D(A, 'poltrona', 596, 184, '#2a5a3a'); D(A, 'poltrona', 716, 184, '#2a5a3a'); D(A, 'mesinha', 655, 196);
-      D(A, 'livro', 700, 160, '#2f5a8e'); D(A, 'livro', 612, 118, '#8e2f2f'); D(A, 'livro', 730, 214, '#2f7a4a'); D(A, 'banqueta', 724, 120);
+      L.estante(A, 580, 12, 50, 40); L.estante(A, 696, 12, 52, 40); L.janela(650, 18, 14, 12, '#2a4a2a');
+      L.tapete(604, 140, 116, 72, '#2a4a32', '#b08a3e');
+      L.escrivaninha(A, 636, 104, 52); L.D(A, 'cadeiraB', 657, 122);
+      L.D(A, 'poltrona', 596, 184, '#2a5a3a'); L.D(A, 'poltrona', 716, 184, '#2a5a3a'); L.D(A, 'mesinha', 655, 196);
+      L.D(A, 'livro', 700, 160, '#2f5a8e'); L.D(A, 'livro', 612, 118, '#8e2f2f'); L.D(A, 'livro', 730, 214, '#2f7a4a'); L.D(A, 'banqueta', 724, 120);
       // Corredor
-      tapete(24, 298, 720, 26, '#5e2228', '#b08a3e');
-      for (const ax of [40, 140, 232, 300, 440, 520, 600, 700]) arandela(A, ax, 262);
-      quadro(166, 260, 26, 20, 0); quadro(262, 260, 26, 20, 2); quadro(470, 260, 26, 20, 1); quadro(560, 260, 26, 20, 0);
-      D(A, 'vaso', 20, 300); D(A, 'vaso', 736, 300);
+      L.tapete(24, 298, 720, 26, '#5e2228', '#b08a3e');
+      for (const ax of [40, 140, 232, 300, 440, 520, 600, 700]) L.arandela(A, ax, 262);
+      L.quadro(166, 260, 26, 20, 0); L.quadro(262, 260, 26, 20, 2); L.quadro(470, 260, 26, 20, 1); L.quadro(560, 260, 26, 20, 0);
+      L.D(A, 'vaso', 20, 300); L.D(A, 'vaso', 736, 300);
       // Lavabo
-      espelho(26, 358); pia(A, 24, 386); sanitario(A, 92, 386); D(A, 'balde', 90, 490); D(A, 'almofada', 30, 488, '#e8e0cc');
+      L.espelho(26, 358); L.pia(A, 24, 386); L.sanitario(A, 92, 386); L.D(A, 'balde', 90, 490); L.D(A, 'almofada', 30, 488, '#e8e0cc');
       // Despensa
-      prateleira(130, 354, 90); prateleira(130, 364, 90);
-      D(A, 'caixote', 132, 390); D(A, 'caixote', 132, 404); D(A, 'barril', 206, 390); D(A, 'caixote', 190, 480);
-      D(A, 'garrafa', 170, 440); D(A, 'garrafa', 176, 446); D(A, 'fruta', 150, 470, '#d8a020'); D(A, 'caixinha', 200, 452);
+      L.prateleira(130, 354, 90); L.prateleira(130, 364, 90);
+      L.D(A, 'caixote', 132, 390); L.D(A, 'caixote', 132, 404); L.D(A, 'barril', 206, 390); L.D(A, 'caixote', 190, 480);
+      L.D(A, 'garrafa', 170, 440); L.D(A, 'garrafa', 176, 446); L.D(A, 'fruta', 150, 470, '#d8a020'); L.D(A, 'caixinha', 200, 452);
       // Hall de entrada
-      tapete(344, 392, 80, 248, '#6e1f26');
-      quadro(246, 356, 36, 24, 1);
-      relogio(A, 506, 420); castical(A, 304, 600); castical(A, 456, 600); castical(A, 304, 400); castical(A, 456, 400);
-      banco(A, 486, 520, 34); banco(A, 300, 470, 30);
-      D(A, 'vaso', 330, 626); D(A, 'vaso', 428, 626); D(A, 'vaso', 490, 600);
-      P(368, 640, 32, 14, '#7a5a2a'); P(370, 642, 28, 10, '#9a7a3a');
-      porta(368, 656);
+      L.tapete(344, 392, 80, 248, '#6e1f26');
+      L.quadro(246, 356, 36, 24, 1);
+      L.relogio(A, 506, 420); L.castical(A, 304, 600); L.castical(A, 456, 600); L.castical(A, 304, 400); L.castical(A, 456, 400);
+      L.banco(A, 486, 520, 34); L.banco(A, 300, 470, 30);
+      L.D(A, 'vaso', 330, 626); L.D(A, 'vaso', 428, 626); L.D(A, 'vaso', 490, 600);
+      L.P(368, 640, 32, 14, '#7a5a2a'); L.P(370, 642, 28, 10, '#9a7a3a');
+      L.porta(368, 656);
       // Sala de música
-      piano(A, 572, 384); D(A, 'banqueta', 584, 410); D(A, 'poltrona', 548, 480, '#3b3f8a'); quadro(548, 356, 22, 18, 2);
-      D(A, 'livro', 620, 460, '#d8cfb8'); D(A, 'bola', 600, 470);
+      L.piano(A, 572, 384); L.D(A, 'banqueta', 584, 410); L.D(A, 'poltrona', 548, 480, '#3b3f8a'); L.quadro(548, 356, 22, 18, 2);
+      L.D(A, 'livro', 620, 460, '#d8cfb8'); L.D(A, 'bola', 600, 470);
       // Escritório
-      estante(A, 724, 348, 24, 36); estante(A, 658, 348, 26, 36); escrivaninha(A, 672, 430, 48); D(A, 'cadeiraB', 691, 448); D(A, 'caixinha', 664, 490); D(A, 'livro', 730, 480, '#b08a2e');
+      L.estante(A, 724, 348, 24, 36); L.estante(A, 658, 348, 26, 36); L.escrivaninha(A, 672, 430, 48); L.D(A, 'cadeiraB', 691, 448); L.D(A, 'caixinha', 664, 490); L.D(A, 'livro', 730, 480, '#b08a2e');
       // Jardim de inverno
-      for (const jx of [30, 80, 130, 180]) janela(jx, 532, 14, 12, null);
-      for (const [vx, vy] of [[22, 566], [44, 566], [190, 566], [22, 632], [110, 600], [150, 630]]) D(A, 'vaso', vx, vy);
-      banco(A, 70, 630, 34); D(A, 'balde', 130, 576);
+      for (const jx of [30, 80, 130, 180]) L.janela(jx, 532, 14, 12, null);
+      for (const [vx, vy] of [[22, 566], [44, 566], [190, 566], [22, 632], [110, 600], [150, 630]]) L.D(A, 'vaso', vx, vy);
+      L.banco(A, 70, 630, 34); L.D(A, 'balde', 130, 576);
       // Sala de estar
-      lareira(A, 630, 522, 40); estante(A, 552, 524, 40, 34); piano(A, 708, 528);
-      tapete(586, 580, 120, 64, '#4a1e2a', '#b08a3e');
-      sofa(A, 616, 630, 56); D(A, 'poltrona', 586, 584); D(A, 'poltrona', 694, 584); D(A, 'mesinha', 637, 600);
-      D(A, 'almofada', 600, 612); D(A, 'almofada', 690, 612, '#3a6a9a'); D(A, 'livro', 652, 612, '#6a3f8e');
+      L.lareira(A, 630, 522, 40); L.estante(A, 552, 524, 40, 34); L.piano(A, 708, 528);
+      L.tapete(586, 580, 120, 64, '#4a1e2a', '#b08a3e');
+      L.sofa(A, 616, 630, 56); L.D(A, 'poltrona', 586, 584); L.D(A, 'poltrona', 694, 584); L.D(A, 'mesinha', 637, 600);
+      L.D(A, 'almofada', 600, 612); L.D(A, 'almofada', 690, 612, '#3a6a9a'); L.D(A, 'livro', 652, 612, '#6a3f8e');
       A.assentosFixos = [[640 * K, 634 * K, 3], [656 * K, 634 * K, 3]];
     },
     1(A) {
       // Quarto 1 e Quarto 2 (em cima), com janelas para a neve
       for (const [ox, c] of [[16, '#3c5f8f'], [576, '#4f7d45']]) {
-        cama(A, ox + 12, 36, c); criado(A, ox + 32, 44); cama(A, ox + 48, 36, c); janela(ox + 86, 18, 14, 12, tom(c, .8));
-        armario(A, ox + 140, 20); tapete(ox + 20, 110, 80, 50, tom(c, .7), '#c9a050');
-        D(A, 'poltrona', ox + 110, 180, tom(c, .9)); D(A, 'mesinha', ox + 60, 196); D(A, 'almofada', ox + 30, 170, '#e8e0cc'); D(A, 'livro', ox + 80, 210);
+        L.cama(A, ox + 12, 36, c); L.criado(A, ox + 32, 44); L.cama(A, ox + 48, 36, c); L.janela(ox + 86, 18, 14, 12, tom(c, .8));
+        L.armario(A, ox + 140, 20); L.tapete(ox + 20, 110, 80, 50, tom(c, .7), '#c9a050');
+        L.D(A, 'poltrona', ox + 110, 180, tom(c, .9)); L.D(A, 'mesinha', ox + 60, 196); L.D(A, 'almofada', ox + 30, 170, '#e8e0cc'); L.D(A, 'livro', ox + 80, 210);
       }
       // Galeria
-      for (let i = 0; i < 6; i++) quadro(224 + i * 56, 17, 30, 24, i % 3);
-      for (const ax of [214, 548]) arandela(A, ax, 24);
-      tapete(240, 90, 288, 120, '#2a3450', '#b08a3e');
-      sofa(A, 300, 190, 60, '#2a3a5a'); sofa(A, 410, 190, 60, '#2a3a5a');
-      D(A, 'poltrona', 260, 120, '#2a3a5a'); D(A, 'poltrona', 494, 120, '#2a3a5a'); D(A, 'mesinha', 378, 150);
-      castical(A, 228, 60); castical(A, 532, 60); D(A, 'vaso', 212, 218); D(A, 'vaso', 544, 218);
+      for (let i = 0; i < 6; i++) L.quadro(224 + i * 56, 17, 30, 24, i % 3);
+      for (const ax of [214, 548]) L.arandela(A, ax, 24);
+      L.tapete(240, 90, 288, 120, '#2a3450', '#b08a3e');
+      L.sofa(A, 300, 190, 60, '#2a3a5a'); L.sofa(A, 410, 190, 60, '#2a3a5a');
+      L.D(A, 'poltrona', 260, 120, '#2a3a5a'); L.D(A, 'poltrona', 494, 120, '#2a3a5a'); L.D(A, 'mesinha', 378, 150);
+      L.castical(A, 228, 60); L.castical(A, 532, 60); L.D(A, 'vaso', 212, 218); L.D(A, 'vaso', 544, 218);
       // Corredor
-      tapete(24, 298, 720, 26, '#2a3450', '#b08a3e');
-      for (const ax of [40, 140, 232, 300, 440, 520, 600, 700]) arandela(A, ax, 262);
-      quadro(166, 260, 26, 20, 1); quadro(470, 260, 26, 20, 2); quadro(560, 260, 26, 20, 0); D(A, 'vaso', 20, 300); D(A, 'vaso', 736, 300);
+      L.tapete(24, 298, 720, 26, '#2a3450', '#b08a3e');
+      for (const ax of [40, 140, 232, 300, 440, 520, 600, 700]) L.arandela(A, ax, 262);
+      L.quadro(166, 260, 26, 20, 1); L.quadro(470, 260, 26, 20, 2); L.quadro(560, 260, 26, 20, 0); L.D(A, 'vaso', 20, 300); L.D(A, 'vaso', 736, 300);
       // Quarto 3 e Quarto 4 (6 blocos: camas dos lados da porta)
       for (const [ox, c] of [[16, '#9a3036'], [656, '#b08a2e']]) {
-        cama(A, ox + 2, 372, c); cama(A, ox + 79, 372, c); criado(A, ox + 20, 382); criado(A, ox + 66, 382);
-        tapete(ox + 14, 430, 68, 34, tom(c, .7), '#c9a050'); bau(A, ox + 38, 490, '#6b4227'); D(A, 'almofada', ox + 12, 480, tom(c, 1.2)); D(A, 'cadeiraB', ox + 74, 470);
+        L.cama(A, ox + 2, 372, c); L.cama(A, ox + 79, 372, c); L.criado(A, ox + 20, 382); L.criado(A, ox + 66, 382);
+        L.tapete(ox + 14, 430, 68, 34, tom(c, .7), '#c9a050'); L.bau(A, ox + 38, 490, '#6b4227'); L.D(A, 'almofada', ox + 12, 480, tom(c, 1.2)); L.D(A, 'cadeiraB', ox + 74, 470);
       }
       // Rouparia
-      prateleira(130, 354, 90); prateleira(130, 364, 90); armario(A, 140, 380, 30, 30, '#6b4227'); armario(A, 180, 380, 30, 30, '#6b4227');
-      D(A, 'almofada', 140, 450, '#e8e0cc'); D(A, 'almofada', 160, 470, '#c8d8e8'); D(A, 'caixinha', 196, 480); D(A, 'balde', 136, 494);
+      L.prateleira(130, 354, 90); L.prateleira(130, 364, 90); L.armario(A, 140, 380, 30, 30, '#6b4227'); L.armario(A, 180, 380, 30, 30, '#6b4227');
+      L.D(A, 'almofada', 140, 450, '#e8e0cc'); L.D(A, 'almofada', 160, 470, '#c8d8e8'); L.D(A, 'caixinha', 196, 480); L.D(A, 'balde', 136, 494);
       // Patamar
-      tapete(344, 392, 80, 248, '#2a3450', '#b08a3e'); quadro(246, 356, 36, 24, 0);
-      castical(A, 304, 400); castical(A, 456, 400); sofa(A, 470, 600, 46, '#2a3a5a'); D(A, 'vaso', 330, 626); D(A, 'vaso', 428, 626); banco(A, 300, 470, 30);
+      L.tapete(344, 392, 80, 248, '#2a3450', '#b08a3e'); L.quadro(246, 356, 36, 24, 0);
+      L.castical(A, 304, 400); L.castical(A, 456, 400); L.sofa(A, 470, 600, 46, '#2a3a5a'); L.D(A, 'vaso', 330, 626); L.D(A, 'vaso', 428, 626); L.banco(A, 300, 470, 30);
       // Banheiro
-      espelho(574, 358); pia(A, 570, 386); banheira(A, 596, 470); sanitario(A, 620, 386); D(A, 'balde', 556, 490); D(A, 'almofada', 552, 450, '#e8e0cc');
+      L.espelho(574, 358); L.pia(A, 570, 386); L.banheira(A, 596, 470); L.sanitario(A, 620, 386); L.D(A, 'balde', 556, 490); L.D(A, 'almofada', 552, 450, '#e8e0cc');
       // Quarto 5 (largo)
-      cama(A, 30, 528, '#6a4a8f'); criado(A, 50, 536); cama(A, 66, 528, '#6a4a8f'); armario(A, 120, 522); escrivaninha(A, 160, 600, 44);
-      D(A, 'cadeiraB', 177, 618); tapete(30, 590, 100, 50, '#4a3462', '#c9a050'); D(A, 'almofada', 40, 610, '#e8e0cc');
+      L.cama(A, 30, 528, '#6a4a8f'); L.criado(A, 50, 536); L.cama(A, 66, 528, '#6a4a8f'); L.armario(A, 120, 522); L.escrivaninha(A, 160, 600, 44);
+      L.D(A, 'cadeiraB', 177, 618); L.tapete(30, 590, 100, 50, '#4a3462', '#c9a050'); L.D(A, 'almofada', 40, 610, '#e8e0cc');
       // Sala de leitura
-      estante(A, 552, 524, 44, 34); estante(A, 700, 524, 48, 34); lareira(A, 630, 522, 36);
-      D(A, 'poltrona', 590, 590, '#2a5a3a'); D(A, 'poltrona', 700, 590, '#2a5a3a'); D(A, 'mesinha', 640, 610); D(A, 'livro', 660, 630, '#2f5a8e'); D(A, 'livro', 620, 636, '#8e2f2f');
+      L.estante(A, 552, 524, 44, 34); L.estante(A, 700, 524, 48, 34); L.lareira(A, 630, 522, 36);
+      L.D(A, 'poltrona', 590, 590, '#2a5a3a'); L.D(A, 'poltrona', 700, 590, '#2a5a3a'); L.D(A, 'mesinha', 640, 610); L.D(A, 'livro', 660, 630, '#2f5a8e'); L.D(A, 'livro', 620, 636, '#8e2f2f');
     },
     2(A) {
       // Suíte de Tomás
-      cama(A, 70, 34, '#7a1f2a', 34); criado(A, 54, 44); criado(A, 108, 44); janela(30, 18, 14, 12, '#5a1f2a'); lareira(A, 140, 14, 34);
-      tapete(50, 110, 110, 70, '#4a1e2a', '#b08a3e'); D(A, 'poltrona', 40, 190, '#5a1f2a'); D(A, 'poltrona', 150, 190, '#5a1f2a'); D(A, 'mesinha', 96, 200);
-      D(A, 'livro', 120, 120, '#2a2a2a'); D(A, 'almofada', 80, 140, '#b03040');
+      L.cama(A, 70, 34, '#7a1f2a', 34); L.criado(A, 54, 44); L.criado(A, 108, 44); L.janela(30, 18, 14, 12, '#5a1f2a'); L.lareira(A, 140, 14, 34);
+      L.tapete(50, 110, 110, 70, '#4a1e2a', '#b08a3e'); L.D(A, 'poltrona', 40, 190, '#5a1f2a'); L.D(A, 'poltrona', 150, 190, '#5a1f2a'); L.D(A, 'mesinha', 96, 200);
+      L.D(A, 'livro', 120, 120, '#2a2a2a'); L.D(A, 'almofada', 80, 140, '#b03040');
       // Salão de bilhar
-      mesaBilhar(A, 342, 100); for (const ax of [258, 328, 436, 506]) arandela(A, ax, 24);
-      P(220, 18, 14, 14, O); P(221, 19, 12, 12, '#e8dfc8'); P(224, 22, 6, 6, '#9a2a2a'); P(226, 24, 2, 2, '#e8dfc8'); // alvo de dardos
-      aparador(A, 470, 46, 70); D(A, 'banqueta', 480, 70); D(A, 'banqueta', 500, 70); D(A, 'banqueta', 520, 70);
-      ['#e8e0cc', '#d8b020', '#2a4ab0', '#c8302a', '#6a2a8a', '#e07020', '#2a8a4a', '#1a1a1a'].forEach((c, i) => D(A, 'bilhar', 300 + (i % 4) * 9, 196 + Math.floor(i / 4) * 9, c));
-      D(A, 'poltrona', 230, 120, '#2a5a3a'); D(A, 'poltrona', 230, 160, '#2a5a3a'); castical(A, 520, 190);
+      L.mesaBilhar(A, 342, 100); for (const ax of [258, 328, 436, 506]) L.arandela(A, ax, 24);
+      L.P(220, 18, 14, 14, O); L.P(221, 19, 12, 12, '#e8dfc8'); L.P(224, 22, 6, 6, '#9a2a2a'); L.P(226, 24, 2, 2, '#e8dfc8'); // alvo de dardos
+      L.aparador(A, 470, 46, 70); L.D(A, 'banqueta', 480, 70); L.D(A, 'banqueta', 500, 70); L.D(A, 'banqueta', 520, 70);
+      ['#e8e0cc', '#d8b020', '#2a4ab0', '#c8302a', '#6a2a8a', '#e07020', '#2a8a4a', '#1a1a1a'].forEach((c, i) => L.D(A, 'bilhar', 300 + (i % 4) * 9, 196 + Math.floor(i / 4) * 9, c));
+      L.D(A, 'poltrona', 230, 120, '#2a5a3a'); L.D(A, 'poltrona', 230, 160, '#2a5a3a'); L.castical(A, 520, 190);
       // Escritório de Tomás
-      estante(A, 580, 12, 50, 40); cofre(A, 700, 30); janela(650, 18, 14, 12, '#3a2a1a');
-      escrivaninha(A, 636, 110, 54); D(A, 'cadeiraB', 658, 128); D(A, 'caixinha', 600, 150); D(A, 'caixinha', 720, 170); D(A, 'livro', 740, 210, '#8e2f2f'); D(A, 'caixote', 590, 210);
+      L.estante(A, 580, 12, 50, 40); L.cofre(A, 700, 30); L.janela(650, 18, 14, 12, '#3a2a1a');
+      L.escrivaninha(A, 636, 110, 54); L.D(A, 'cadeiraB', 658, 128); L.D(A, 'caixinha', 600, 150); L.D(A, 'caixinha', 720, 170); L.D(A, 'livro', 740, 210, '#8e2f2f'); L.D(A, 'caixote', 590, 210);
       // Corredor
-      tapete(24, 298, 720, 26, '#3a2a1a', '#b08a3e'); for (const ax of [40, 140, 232, 300, 440, 520, 600, 700]) arandela(A, ax, 262);
-      quadro(166, 260, 26, 20, 2); quadro(470, 260, 26, 20, 0); D(A, 'vaso', 20, 300); D(A, 'vaso', 736, 300);
+      L.tapete(24, 298, 720, 26, '#3a2a1a', '#b08a3e'); for (const ax of [40, 140, 232, 300, 440, 520, 600, 700]) L.arandela(A, ax, 262);
+      L.quadro(166, 260, 26, 20, 2); L.quadro(470, 260, 26, 20, 0); L.D(A, 'vaso', 20, 300); L.D(A, 'vaso', 736, 300);
       // Closet
-      for (let i = 0; i < 4; i++) { P(20 + i * 22, 362, 18, 2, '#3a3a3e'); P(21 + i * 22, 364, 6, 14, ['#3a4a6a', '#6a2a2a', '#2a2a2a', '#5a4a3a'][i]); P(29 + i * 22, 364, 6, 14, ['#6a5a3a', '#2a3a2a', '#4a2a4a', '#7a6a5a'][i]); }
-      bau(A, 26, 480); D(A, 'caixinha', 80, 470); D(A, 'almofada', 60, 440, '#6a2a2a');
+      for (let i = 0; i < 4; i++) { L.P(20 + i * 22, 362, 18, 2, '#3a3a3e'); L.P(21 + i * 22, 364, 6, 14, ['#3a4a6a', '#6a2a2a', '#2a2a2a', '#5a4a3a'][i]); L.P(29 + i * 22, 364, 6, 14, ['#6a5a3a', '#2a3a2a', '#4a2a4a', '#7a6a5a'][i]); }
+      L.bau(A, 26, 480); L.D(A, 'caixinha', 80, 470); L.D(A, 'almofada', 60, 440, '#6a2a2a');
       // Banheiro da suíte
-      espelho(140, 358); pia(A, 138, 386); banheira(A, 160, 470); sanitario(A, 196, 386); D(A, 'balde', 136, 494);
+      L.espelho(140, 358); L.pia(A, 138, 386); L.banheira(A, 160, 470); L.sanitario(A, 196, 386); L.D(A, 'balde', 136, 494);
       // Patamar (sem escada para cima)
-      tapete(344, 392, 80, 248, '#3a2a1a', '#b08a3e'); telescopio(A, 470, 600); castical(A, 304, 600); castical(A, 456, 400); D(A, 'vaso', 330, 626); D(A, 'vaso', 428, 626);
+      L.tapete(344, 392, 80, 248, '#3a2a1a', '#b08a3e'); L.telescopio(A, 470, 600); L.castical(A, 304, 600); L.castical(A, 456, 400); L.D(A, 'vaso', 330, 626); L.D(A, 'vaso', 428, 626);
       // Sala de troféus
-      for (let i = 0; i < 4; i++) { P(552 + i * 20, 358, 10, 2, '#5a3620'); P(554 + i * 20, 350, 6, 8, '#d0a850'); P(556 + i * 20, 352, 2, 3, '#f0d070'); }
-      quadro(560, 400, 30, 20, 1); D(A, 'bola', 590, 470, '#2a6ab0'); D(A, 'vaso', 548, 490); bau(A, 600, 490, '#5a3620');
+      for (let i = 0; i < 4; i++) { L.P(552 + i * 20, 358, 10, 2, '#5a3620'); L.P(554 + i * 20, 350, 6, 8, '#d0a850'); L.P(556 + i * 20, 352, 2, 3, '#f0d070'); }
+      L.quadro(560, 400, 30, 20, 1); L.D(A, 'bola', 590, 470, '#2a6ab0'); L.D(A, 'vaso', 548, 490); L.bau(A, 600, 490, '#5a3620');
       // Observatório
-      telescopio(A, 694, 400); janela(680, 356, 30, 12, null); D(A, 'banqueta', 680, 440); D(A, 'livro', 720, 480, '#1a2a5a'); D(A, 'caixinha', 670, 490);
+      L.telescopio(A, 694, 400); L.janela(680, 356, 30, 12, null); L.D(A, 'banqueta', 680, 440); L.D(A, 'livro', 720, 480, '#1a2a5a'); L.D(A, 'caixinha', 670, 490);
       // Sótão
-      for (const [cx, cy] of [[24, 566], [24, 582], [40, 570], [180, 570], [196, 570], [190, 590], [100, 620]]) D(A, 'caixote', cx, cy);
-      bau(A, 120, 540); bau(A, 60, 630, '#5a3620'); D(A, 'barril', 150, 620); D(A, 'caixinha', 80, 590); D(A, 'bola', 140, 600, '#d8b020'); D(A, 'almofada', 170, 640);
+      for (const [cx, cy] of [[24, 566], [24, 582], [40, 570], [180, 570], [196, 570], [190, 590], [100, 620]]) L.D(A, 'caixote', cx, cy);
+      L.bau(A, 120, 540); L.bau(A, 60, 630, '#5a3620'); L.D(A, 'barril', 150, 620); L.D(A, 'caixinha', 80, 590); L.D(A, 'bola', 140, 600, '#d8b020'); L.D(A, 'almofada', 170, 640);
       // Terraço de inverno
-      for (const jx of [560, 610, 660, 710]) janela(jx, 532, 16, 12, null);
-      for (const [vx, vy] of [[550, 566], [730, 566], [550, 632], [730, 632], [640, 600]]) D(A, 'vaso', vx, vy);
-      banco(A, 600, 630, 34); banco(A, 670, 630, 34); D(A, 'balde', 700, 600);
+      for (const jx of [560, 610, 660, 710]) L.janela(jx, 532, 16, 12, null);
+      for (const [vx, vy] of [[550, 566], [730, 566], [550, 632], [730, 632], [640, 600]]) L.D(A, 'vaso', vx, vy);
+      L.banco(A, 600, 630, 34); L.banco(A, 670, 630, 34); L.D(A, 'balde', 700, 600);
     },
     '-1'(A) {
       // Adega
-      for (let i = 0; i < 4; i++) { const bx = 24 + i * 40; P(bx, 18, 34, 30, O); P(bx + 1, 19, 32, 28, '#3a2416'); for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) { P(bx + 3 + c * 6, 21 + r * 9, 5, 7, '#5a3620'); P(bx + 4 + c * 6, 23 + r * 9, 3, 3, '#2a0a10'); } fixo(A, [bx, 40, 34, 10]); }
-      for (const [bx, by] of [[30, 120], [44, 124], [30, 140], [150, 120], [164, 126]]) D(A, 'barril', bx, by);
-      for (const [gx, gy] of [[90, 160], [96, 166], [104, 158], [120, 200]]) D(A, 'garrafa', gx, gy);
+      for (let i = 0; i < 4; i++) { const bx = 24 + i * 40; L.P(bx, 18, 34, 30, O); L.P(bx + 1, 19, 32, 28, '#3a2416'); for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) { L.P(bx + 3 + c * 6, 21 + r * 9, 5, 7, '#5a3620'); L.P(bx + 4 + c * 6, 23 + r * 9, 3, 3, '#2a0a10'); } fixo(A, [bx, 40, 34, 10]); }
+      for (const [bx, by] of [[30, 120], [44, 124], [30, 140], [150, 120], [164, 126]]) L.D(A, 'barril', bx, by);
+      for (const [gx, gy] of [[90, 160], [96, 166], [104, 158], [120, 200]]) L.D(A, 'garrafa', gx, gy);
       // Depósito
-      for (let i = 0; i < 3; i++) prateleira(230 + i * 110, 20, 90);
-      for (const [cx, cy] of [[230, 70], [244, 70], [230, 84], [400, 120], [414, 120], [407, 106], [500, 200], [514, 204], [330, 190]]) D(A, 'caixote', cx, cy);
-      D(A, 'barril', 300, 120); D(A, 'barril', 520, 80); D(A, 'caixinha', 360, 160); D(A, 'caixinha', 470, 150); D(A, 'balde', 260, 200); D(A, 'pneu', 440, 200);
+      for (let i = 0; i < 3; i++) L.prateleira(230 + i * 110, 20, 90);
+      for (const [cx, cy] of [[230, 70], [244, 70], [230, 84], [400, 120], [414, 120], [407, 106], [500, 200], [514, 204], [330, 190]]) L.D(A, 'caixote', cx, cy);
+      L.D(A, 'barril', 300, 120); L.D(A, 'barril', 520, 80); L.D(A, 'caixinha', 360, 160); L.D(A, 'caixinha', 470, 150); L.D(A, 'balde', 260, 200); L.D(A, 'pneu', 440, 200);
       // Casa da caldeira
-      caldeira(A, 640, 40); canos(580, 30, 170); canos(580, 220, 170); D(A, 'balde', 600, 150); D(A, 'caixote', 720, 200); D(A, 'caixinha', 700, 120);
+      L.caldeira(A, 640, 40); L.canos(580, 30, 170); L.canos(580, 220, 170); L.D(A, 'balde', 600, 150); L.D(A, 'caixote', 720, 200); L.D(A, 'caixinha', 700, 120);
       // Corredor
-      for (const ax of [40, 232, 440, 600, 700]) arandela(A, ax, 262); canos(24, 258, 720);
+      for (const ax of [40, 232, 440, 600, 700]) L.arandela(A, ax, 262); L.canos(24, 258, 720);
       // Lavanderia
-      bancadaSimples(22, 378, 40, '#8a9098'); fixo(A, [22, 380, 40, 10]); P(26, 380, 32, 6, '#6a8aa0'); D(A, 'balde', 70, 400); D(A, 'caixinha', 30, 470); D(A, 'almofada', 80, 480, '#c8d8e8');
+      L.bancadaSimples(22, 378, 40, '#8a9098'); fixo(A, [22, 380, 40, 10]); L.P(26, 380, 32, 6, '#6a8aa0'); L.D(A, 'balde', 70, 400); L.D(A, 'caixinha', 30, 470); L.D(A, 'almofada', 80, 480, '#c8d8e8');
       // Câmara fria
-      prateleira(130, 354, 90); prateleira(130, 364, 90); D(A, 'caixote', 134, 400); D(A, 'caixote', 200, 400); D(A, 'fruta', 160, 460, '#3a8a3a'); D(A, 'fruta', 170, 470); D(A, 'caixinha', 190, 480);
+      L.prateleira(130, 354, 90); L.prateleira(130, 364, 90); L.D(A, 'caixote', 134, 400); L.D(A, 'caixote', 200, 400); L.D(A, 'fruta', 160, 460, '#3a8a3a'); L.D(A, 'fruta', 170, 470); L.D(A, 'caixinha', 190, 480);
       // Patamar
-      for (const ax of [304, 456]) arandela(A, ax, 358);
-      D(A, 'caixote', 470, 600); D(A, 'caixote', 486, 610); D(A, 'barril', 320, 610);
+      for (const ax of [304, 456]) L.arandela(A, ax, 358);
+      L.D(A, 'caixote', 470, 600); L.D(A, 'caixote', 486, 610); L.D(A, 'barril', 320, 610);
       // Oficina
-      bancada(A, 552, 380, 80, '#4a3a2a'); for (let i = 0; i < 6; i++) P(556 + i * 12, 360, 2, 10, '#8a8a90'); D(A, 'banqueta', 580, 410); D(A, 'caixinha', 600, 470); D(A, 'pneu', 560, 480);
+      L.bancada(A, 552, 380, 80, '#4a3a2a'); for (let i = 0; i < 6; i++) L.P(556 + i * 12, 360, 2, 10, '#8a8a90'); L.D(A, 'banqueta', 580, 410); L.D(A, 'caixinha', 600, 470); L.D(A, 'pneu', 560, 480);
       // Gerador
-      box(670, 380, 40, 26, '#4a5a4a'); P(674, 384, 32, 8, '#3a4a3a'); P(700, 396, 4, 4, '#f0d070'); fixo(A, [670, 384, 40, 22]); A.anims.push({ t: 'pisca', x: 700, y: 396 }); luz(A, 702, 398, 40, 'lampada');
-      box(724, 356, 20, 26, '#5a5e64'); P(728, 360, 12, 2, '#d0a850'); D(A, 'balde', 680, 480);
+      L.box(670, 380, 40, 26, '#4a5a4a'); L.P(674, 384, 32, 8, '#3a4a3a'); L.P(700, 396, 4, 4, '#f0d070'); fixo(A, [670, 384, 40, 22]); A.anims.push({ t: 'pisca', x: 700, y: 396 }); luz(A, 702, 398, 40, 'lampada');
+      L.box(724, 356, 20, 26, '#5a5e64'); L.P(728, 360, 12, 2, '#d0a850'); L.D(A, 'balde', 680, 480);
       // Garagem (o portão leva ao jardim)
-      carro(A, 34, 566); prateleira(110, 532, 100); D(A, 'pneu', 170, 600); D(A, 'pneu', 186, 616); D(A, 'pneu', 172, 630);
-      D(A, 'caixote', 120, 620); D(A, 'balde', 150, 580); D(A, 'bola', 140, 640, '#2a6ab0');
-      portaoGaragem(80, 656, 64);
+      L.carro(A, 34, 566); L.prateleira(110, 532, 100); L.D(A, 'pneu', 170, 600); L.D(A, 'pneu', 186, 616); L.D(A, 'pneu', 172, 630);
+      L.D(A, 'caixote', 120, 620); L.D(A, 'balde', 150, 580); L.D(A, 'bola', 140, 640, '#2a6ab0');
+      L.portaoGaragem(80, 656, 64);
       // Arquivo
-      for (let i = 0; i < 5; i++) { box(552 + i * 24, 528, 20, 30, '#5a5e64'); for (let r = 0; r < 3; r++) P(554 + i * 24, 532 + r * 9, 16, 1, '#3a3e44'), P(560 + i * 24, 535 + r * 9, 4, 1, '#b0b8c0'); fixo(A, [552 + i * 24, 548, 20, 10]); }
-      D(A, 'caixote', 700, 600); D(A, 'caixote', 714, 610); D(A, 'caixinha', 620, 600); D(A, 'caixinha', 650, 620); D(A, 'livro', 600, 630, '#5a4a3a');
+      for (let i = 0; i < 5; i++) { L.box(552 + i * 24, 528, 20, 30, '#5a5e64'); for (let r = 0; r < 3; r++) L.P(554 + i * 24, 532 + r * 9, 16, 1, '#3a3e44'), L.P(560 + i * 24, 535 + r * 9, 4, 1, '#b0b8c0'); fixo(A, [552 + i * 24, 548, 20, 10]); }
+      L.D(A, 'caixote', 700, 600); L.D(A, 'caixote', 714, 610); L.D(A, 'caixinha', 620, 600); L.D(A, 'caixinha', 650, 620); L.D(A, 'livro', 600, 630, '#5a4a3a');
     },
   };
 
