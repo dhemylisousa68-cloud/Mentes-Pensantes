@@ -32,7 +32,7 @@ UC.PERSONAGENS = [
 // Nº 7: animação quadro a quadro mandando um beijo (folha com 6 poses de 320 × 500, ancoradas pelos pés).
 // quadros = [até que milissegundo, qual pose]; coracao = trajeto em pixels da pose.
 // Nº 3: dancinha em loop (6 poses de 284 × 470 tocadas na ordem 0,1,2,1,3,4,5,4 a 5 quadros/s).
-// Convite de Tomás (vídeo antes de entrar no mapa). Por enquanto só o Nº 3 tem o seu.
+// Convite de Tomás (vídeo antes de entrar no mapa). Por enquanto: Nº 3 e Nº 7.
 // voz: arquivo da narração gravada (toca no segundo "falaEm"). Enquanto não houver gravação: sem narração.
 UC.PERSONAGENS.find((p) => p.id === 'cecilia').convite = {
   video: 'assets/convites/p03.mp4',
@@ -40,6 +40,14 @@ UC.PERSONAGENS.find((p) => p.id === 'cecilia').convite = {
   fala: 'Precisamos conversar. Venha à ceia. Há algo que você precisa saber. Tomás.',
   falaEm: 13.6,
   voz: 'assets/convites/p03-voz.wav', // gravação tratada: voz natural (tom original, limpa, frases niveladas, quase sem ambiente)
+};
+// Nº 7: a coruja mensageira no parque.
+UC.PERSONAGENS.find((p) => p.id === 'isadora').convite = {
+  video: 'assets/convites/p07.mp4',
+  capa: 'assets/convites/p07-capa.jpg',
+  fala: 'Precisamos conversar. Venha à ceia. Há algo que você precisa saber. Tomás.',
+  falaEm: 12.8,
+  voz: 'assets/convites/p07-voz.wav', // gravação original: só cortada nas pontas e com volume ajustado
 };
 
 UC.PERSONAGENS.find((p) => p.id === 'cecilia').folha = {
