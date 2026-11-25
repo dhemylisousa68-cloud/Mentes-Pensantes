@@ -49,8 +49,8 @@
           if (!p || p.id === meuId || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
           const o = outros.get(p.id) || { nome: p.nome, n: p.n, x: p.x, y: p.y, phase: 0 };
           // pulo grande (entrou/saiu de um lugar): teleporta em vez de deslizar
-          if (Math.hypot(p.x - o.x, p.y - o.y) > 160 || p.inside !== o.inside) { o.x = p.x; o.y = p.y; }
-          Object.assign(o, { id: p.id, alvoX: p.x, alvoY: p.y, dir: p.dir, andando: p.andando, seated: p.seated, inside: p.inside, garage: p.garage, carry: !!p.carry, nome: p.nome || o.nome, n: p.n || o.n, visto: performance.now() });
+          if (Math.hypot(p.x - o.x, p.y - o.y) > 160 || p.inside !== o.inside || p.andar !== o.andar) { o.x = p.x; o.y = p.y; }
+          Object.assign(o, { id: p.id, alvoX: p.x, alvoY: p.y, dir: p.dir, andando: p.andando, seated: p.seated, inside: p.inside, garage: p.garage, andar: p.andar ?? null, carry: !!p.carry, nome: p.nome || o.nome, n: p.n || o.n, visto: performance.now() });
           outros.set(p.id, o);
           atualizarStatus();
         })
@@ -59,6 +59,7 @@
         .on('broadcast', { event: 'voz' }, ({ payload: p }) => { if (p && p.id !== meuId) dispatchEvent(new CustomEvent('mapa:voz', { detail: p })); })
         .on('broadcast', { event: 'portao' }, ({ payload: p }) => receberPortao(p))
         .on('broadcast', { event: 'caixa' }, ({ payload: p }) => receberCaixa(p))
+        .on('broadcast', { event: 'fis' }, ({ payload: p }) => { if (p && p.id !== meuId) dispatchEvent(new CustomEvent('mapa:fis', { detail: p })); })
         // alguém chegou: conta para ele como está o mundo (portão e caixa)
         .on('presence', { event: 'join' }, ({ key }) => { if (key !== meuId) setTimeout(enviarMundo, 300 + Math.random() * 400); })
         .subscribe(async (s) => {
@@ -139,15 +140,18 @@
     if (caixaDono === id) { caixaDono = null; obj = o ? { x: o.x + 22, y: o.y } : { x: 810, y: 740 }; caixaVista = ''; }
   }
 
+  // andar da mansão em que estou (null = fora)
+  const andarAtual = () => (window.Interior ? Interior.andar : null);
+
   function enviar(t, forcar) {
     if (!pronto || !canal) return;
     verMundo();
     const andando = !!(keys.w || keys.a || keys.s || keys.d || keys.arrowup || keys.arrowdown || keys.arrowleft || keys.arrowright) && !seated;
-    const estado = `${Math.round(x)},${Math.round(y)},${dir},${andando},${seated},${inside},${garage},${selected},${carry}`;
+    const estado = `${Math.round(x)},${Math.round(y)},${dir},${andando},${seated},${inside},${garage},${andarAtual()},${selected},${carry}`;
     const intervalo = andando ? 100 : 2000;
     if (!forcar && (t - ultimoEnvio < intervalo || (estado === ultimoEstado && t - ultimoEnvio < 2000))) return;
     ultimoEnvio = t; ultimoEstado = estado;
-    canal.send({ type: 'broadcast', event: 'pos', payload: { id: meuId, nome: meuNome, n: selected + 1, x, y, dir, andando, seated, inside, garage, carry } });
+    canal.send({ type: 'broadcast', event: 'pos', payload: { id: meuId, nome: meuNome, n: selected + 1, x, y, dir, andando, seated, inside, garage, andar: andarAtual(), carry } });
   }
 
   // troca de personagem pelos botões de teste: avisa os outros
@@ -163,7 +167,7 @@
     ctx.font = '12px system-ui'; ctx.textAlign = 'center';
     for (const o of outros.values()) {
       if (agora - o.visto > 15000) continue;               // sumiu (aba fechada, sem rede)
-      if (!!o.inside !== !!inside || !!o.garage !== !!garage) continue; // só quem está no mesmo lugar
+      if (!!o.inside !== !!inside || !!o.garage !== !!garage || (inside && (o.andar ?? 0) !== andarAtual())) continue; // só quem está no mesmo lugar
       const k = Math.min(1, dt * 10);
       o.x += (o.alvoX - o.x) * k; o.y += (o.alvoY - o.y) * k;
       o.phase = o.andando ? o.phase + dt * Number(fps.value) : 0;
