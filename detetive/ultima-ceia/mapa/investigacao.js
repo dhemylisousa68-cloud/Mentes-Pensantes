@@ -99,6 +99,11 @@
   #inv-vinheta .dia{font:bold clamp(44px,10vw,110px) Georgia;letter-spacing:12px;color:#c9a050}
   #inv-vinheta .tit{font:clamp(18px,3vw,28px) Georgia;letter-spacing:4px;margin-top:6px;color:#e8dcc0}
   #inv-vinheta .frase{font:italic clamp(15px,2.4vw,22px) Georgia;margin-top:28px;color:#b85050;max-width:80vw}
+  #inv-hud{position:fixed;z-index:26;left:12px;top:128px;padding:8px 12px;background:rgba(20,14,10,.78);border:1px solid #b08a3e;border-radius:8px;color:#f0e2c0;font:13px system-ui;line-height:1.45;max-width:270px;pointer-events:none;display:none}
+  #inv-hud b{font:bold 15px Georgia;color:#e8bd70}
+  #inv-hud .prog{color:#cdbb92}
+  #inv-hud .salvo{color:#9fd8a0;font-size:12px;transition:color .4s}
+  #inv-hud .salvo.novo{color:#ffffff}
   #inv-toast{position:fixed;z-index:46;left:50%;top:64px;transform:translateX(-50%);padding:9px 16px;background:rgba(30,20,14,.92);color:#f0e2c0;border:1px solid #b08a3e;border-radius:8px;font:14px system-ui;display:none;max-width:80vw;text-align:center}
   `;
   document.head.append(css);
@@ -112,7 +117,8 @@
     <div class="corpo"></div><div class="acoes"><button class="recomecar" hidden>Recomeçar teste</button><button class="encerrar" hidden>Encerrar o dia</button><button class="fechar">Fechar</button></div>`;
   const toast = document.createElement('div'); toast.id = 'inv-toast';
   const vinheta = document.createElement('div'); vinheta.id = 'inv-vinheta';
-  document.body.append(bt, painel, toast, vinheta);
+  const hud = document.createElement('div'); hud.id = 'inv-hud';
+  document.body.append(bt, painel, toast, vinheta, hud);
   let aba = 'pistas';
   bt.onclick = () => alternarDiario();
   painel.querySelector('.fechar').onclick = () => alternarDiario(false);
@@ -228,7 +234,25 @@
     if (antes) for (const a of r.achados || []) if (a.pista && !(antes.achados || []).some((b) => b.id === a.id)) avisar(`Nova pista: ${a.pista} — ${a.titulo} (por ${a.por})`, 4200);
     if (r.fechamento && !avisados.has('fim' + r.dia)) { avisados.add('fim' + r.dia); fimDoDia(r); }
     if (!antes) vinhetaDoDia(r);
+    desenharHud();
     if (painel.classList.contains('aberto')) desenharDiario(); else bt.querySelector('.n').textContent = (r.achados || []).filter((a) => a.pista).length;
+  }
+  // painel fixo: em que dia (noite) estamos, quanto o grupo avançou e quando o progresso foi salvo no servidor
+  let ultimoSalvo = null;
+  function desenharHud() {
+    if (!est) { hud.style.display = 'none'; return; }
+    const ach = est.achados || [], pistas = ach.filter((a) => a.pista).length, outros = ach.length - pistas, hip = (est.hipoteses || []).length;
+    const datas = [...ach.map((a) => a.em), ...(est.hipoteses || []).map((h) => h.em)].filter(Boolean).map((t) => Date.parse(t));
+    const salvo = datas.length ? Math.max(...datas) : null;
+    const hora = (t) => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+    const fim = est.dia_concluido >= est.dia;
+    hud.innerHTML = `<b>Dia ${est.dia}</b> · ${esc(est.titulo || '')}${teste ? ' <small>(teste)</small>' : ''}<br>`
+      + `<span class="prog">${plural(pistas, 'pista', 'pistas')} · ${plural(outros, 'achado', 'achados')} · ${plural(hip, 'hipótese', 'hipóteses')}${fim ? ' · dia encerrado' : ''}</span><br>`
+      + `<span class="salvo">${salvo ? '💾 Progresso salvo às ' + hora(salvo) : '💾 Tudo o que vocês encontrarem fica salvo'}</span>`;
+    hud.style.display = 'block';
+    if (salvo && ultimoSalvo && salvo > ultimoSalvo) { const s = hud.querySelector('.salvo'); s.classList.add('novo'); setTimeout(() => s.classList.remove('novo'), 900); }
+    ultimoSalvo = salvo;
   }
   let recarga = 0;
   function pedirRecarga() { clearTimeout(recarga); recarga = setTimeout(() => carregar().catch(() => {}), 250); }
