@@ -217,6 +217,15 @@ UC.Som = (() => {
 
   function retomarMusica() { aplicarVolumes(); }
 
+  // Silencia tudo (música, chuva e efeitos) e para a caixinha de música — usado no convite,
+  // para ficar só o som da animação.
+  function calar(seg = 0.8) {
+    if (!ctx) return;
+    geral.gain.cancelScheduledValues(ctx.currentTime);
+    geral.gain.setTargetAtTime(0, ctx.currentTime, seg / 3);
+    clearInterval(relogio);
+  }
+
   // ---------- ciclo das velas ----------
   // sopro curto quando a chama apaga
   function sopro() {
@@ -251,5 +260,5 @@ UC.Som = (() => {
 
   UC.Ajustes.aoMudar(aplicarVolumes);
 
-  return { iniciar, clique, rangido, erro, silenciarMusica, retomarMusica, sopro, sussurro, acender, get ativo() { return iniciado; } };
+  return { iniciar, clique, rangido, erro, silenciarMusica, retomarMusica, calar, sopro, sussurro, acender, get ativo() { return iniciado; } };
 })();

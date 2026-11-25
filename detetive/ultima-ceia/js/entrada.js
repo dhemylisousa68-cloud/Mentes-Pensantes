@@ -146,7 +146,10 @@
     const id = UC.Sala.meuPersonagem();
     const n = UC.PERSONAGENS.findIndex((p) => p.id === id) + 1;
     try { if (n > 0) sessionStorage.setItem("uc_personagem_n", String(n)); } catch (e) { /* ignora */ }
-    location.href = "mapa/";
+    // antes do mapa: o convite de Tomás do seu personagem (se ele já tiver um)
+    const p = UC.PERSONAGENS.find((q) => q.id === id);
+    if (UC.Convite) UC.Convite.mostrar(p, () => { location.href = "mapa/"; });
+    else location.href = "mapa/";
   }
   function voltarParaSala() {
     UC.Som.clique();
