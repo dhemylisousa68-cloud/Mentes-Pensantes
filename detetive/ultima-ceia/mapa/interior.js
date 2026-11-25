@@ -57,7 +57,7 @@
         B2: { nome: 'Despensa', piso: 'pedra', parede: 'tijolo', txt: 'Despensa: mantimentos, garrafas e caixotes.' },
         H: { nome: 'Hall de entrada', piso: 'marmore', ...papel('#d4c29c', '#c7b48e'), txt: 'Hall de entrada: escadas, elevador e a porta para o jardim.' },
         B3: { nome: 'Sala de música', piso: 'escura', ...papel('#3b3f62', '#33375a', '#3e2717'), txt: 'Sala de música: um piano de cauda e partituras.' },
-        B4: { nome: 'Escritório', piso: 'escura', ...papel('#4a3b2a', '#403325', '#3e2717'), txt: 'Escritório: escrivaninha, arquivos e livros.' },
+        B4: { nome: 'Escritório de Tomás', piso: 'escura', ...papel('#4a3b2a', '#403325', '#3e2717'), txt: 'Escritório de Tomás.' },
         C1: { nome: 'Jardim de inverno', piso: 'verde', ...papel('#7d9a86', '#728f7b'), txt: 'Jardim de inverno: plantas, regador e um banco.' },
         C2: { nome: 'Sala de estar', piso: 'escura', ...papel('#5a2433', '#4e1f2c', '#3e2717'), txt: 'Sala de estar: a lareira crepita.' },
       },
@@ -84,7 +84,7 @@
       salas: {
         A1: { nome: 'Suíte de Tomás', piso: 'escura', ...papel('#4a2430', '#401f29', '#3e2717'), txt: 'Suíte de Tomás: cama de casal e uma lareira pequena.' },
         A2: { nome: 'Salão de bilhar', piso: 'madeira', ...papel('#2f4a3a', '#283f31', '#3e2717'), txt: 'Salão de bilhar: a mesa verde e um alvo de dardos.' },
-        A3: { nome: 'Escritório de Tomás', piso: 'escura', ...papel('#4a3b2a', '#403325', '#3e2717'), txt: 'Escritório de Tomás: um cofre, estantes e papéis.' },
+        A3: { nome: 'Gabinete particular', piso: 'escura', ...papel('#4a3b2a', '#403325', '#3e2717'), txt: 'Gabinete particular: um cofre, estantes e papéis.' },
         C: { nome: 'Corredor do 3º andar', piso: 'madeira', ...papel('#a8916e', '#9a8464'), txt: 'Corredor do 3º andar.' },
         B1: { nome: 'Closet', piso: 'clara', ...papel('#b9a58a', '#ab977e'), txt: 'Closet: roupas, chapéus e baús.' },
         B2: { nome: 'Banheiro da suíte', piso: 'azulejo', ...papel('#9fb4b8', '#93a8ac'), txt: 'Banheiro da suíte: banheira e espelho.' },
@@ -450,7 +450,7 @@
       piano(A, 572, 384); D(A, 'banqueta', 584, 410); D(A, 'poltrona', 548, 480, '#3b3f8a'); quadro(548, 356, 22, 18, 2);
       D(A, 'livro', 620, 460, '#d8cfb8'); D(A, 'bola', 600, 470);
       // Escritório
-      estante(A, 700, 348, 48, 36); escrivaninha(A, 672, 430, 48); D(A, 'cadeiraB', 691, 448); D(A, 'caixinha', 664, 490); D(A, 'livro', 730, 480, '#b08a2e');
+      estante(A, 724, 348, 24, 36); estante(A, 658, 348, 26, 36); escrivaninha(A, 672, 430, 48); D(A, 'cadeiraB', 691, 448); D(A, 'caixinha', 664, 490); D(A, 'livro', 730, 480, '#b08a2e');
       // Jardim de inverno
       for (const jx of [30, 80, 130, 180]) janela(jx, 532, 14, 12, null);
       for (const [vx, vy] of [[22, 566], [44, 566], [190, 566], [22, 632], [110, 600], [150, 630]]) D(A, 'vaso', vx, vy);
@@ -577,6 +577,8 @@
   const andarDe = (n) => cache[n] || (cache[n] = construir(n));
   let andar = 0, ultimoQuadro = 0, salaAtual = -2, escuro = 0, segurado = null, vistaX = 0, vistaY = 0;
   let elevAnim = { abre: 1, alvo: 1 }, viagem = null, ultimoEnvioFis = 0, cooldownEscada = 0;
+  let dentroAntes = false;
+  (function vigiar() { if (!inside) dentroAntes = false; requestAnimationFrame(vigiar); })();
 
   // ---------- colisão ----------
   function blocoLivre(A, nx, ny) { // nx, ny em px nativos
@@ -587,6 +589,7 @@
     return false;
   }
   function areaLivre(A, x0, y0, x1, y1, corpo) {
+    if (window.Investigacao && Investigacao.bloqueia(A.nivel, x0, y0, x1, y1)) return false;
     for (const [px, py] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1], [(x0 + x1) / 2, y0], [(x0 + x1) / 2, y1]]) if (!blocoLivre(A, px, py)) return false;
     if (bateFixo(A, x0, y0, x1, y1)) return false;
     if (corpo) { // objetos não passam pela porta da frente / portão nem entram nas escadas
@@ -821,8 +824,10 @@
   function desenhar() {
     const agora = performance.now();
     const dt = Math.min(.05, (agora - (ultimoQuadro || agora)) / 1000);
-    // entrou agora (porta da frente ou portão da garagem)
-    if (agora - ultimoQuadro > 300) {
+    // entrou agora (porta da frente ou portão da garagem). Não usa o tempo entre quadros:
+    // com a aba em segundo plano os quadros param, e isso não pode mandar ninguém de volta ao hall.
+    if (!dentroAntes) {
+      dentroAntes = true;
       if (garage) { garage = false; andar = -1; x = 6.5 * 48; y = 40 * 48; dir = 3; msg.textContent = 'Garagem (porão)'; }
       else { andar = 0; x = 24 * 48; y = 40 * 48 + 14; dir = 3; msg.textContent = 'Hall de entrada'; }
       escuro = 1; salaAtual = -2; seated = false;
@@ -859,6 +864,7 @@
     const sw = Math.min(NW - sx, Math.ceil(vw / K) + 2), sh = Math.min(NH - sy, Math.ceil(vh / K) + 2);
     ctx.drawImage(A.tela, sx, sy, sw, sh, sx * K, sy * K, sw * K, sh * K);
     animar(A, agora);
+    if (window.Investigacao) Investigacao.desenharMundo(A.nivel, ctx, agora);
     // objetos atrás do personagem
     const atras = (c) => c.y <= y || (seated && Math.hypot(c.x - x, c.y - y) < 40);
     for (const c of A.corpos.filter((c) => c !== segurado && atras(c)).sort((a, b) => a.y - b.y)) desenharCorpo(c);
@@ -866,7 +872,7 @@
 
     // nome do cômodo
     const i = A.cel(Math.floor(x / 48), Math.floor((y - 4) / 48));
-    if (i >= 0 && i !== salaAtual) { salaAtual = i; msg.textContent = `${NOMES_ANDAR[andar]} — ${A.salas[i].nome}`; }
+    if (i >= 0 && i !== salaAtual) { salaAtual = i; if (window.Investigacao) Investigacao.entrouEm(andar, A.salas[i].chave); msg.textContent = `${NOMES_ANDAR[andar]} — ${A.salas[i].nome}`; }
     enviarFisica(agora);
   }
   // por cima do personagem: objetos à frente, objeto segurado, rótulo do andar e escurecimento das transições
@@ -881,6 +887,7 @@
     const mx = vistaX + cv.width / 2;
     ctx.fillStyle = 'rgba(20,14,10,.72)'; ctx.fillRect(mx - w / 2, vistaY + 12, w, 28);
     ctx.fillStyle = '#f0e2c0'; ctx.fillText(rot, mx, vistaY + 31);
+    if (window.Investigacao) Investigacao.desenharFrente(andar, ctx, vistaX, vistaY, cv.width, cv.height, performance.now());
     if (escuro > 0) { ctx.fillStyle = `rgba(0,0,0,${escuro})`; ctx.fillRect(vistaX, vistaY, cv.width, cv.height); escuro = Math.max(0, escuro - .05); }
     ctx.restore();
   }
@@ -927,5 +934,5 @@
     MapaOnline.__interior = true; clearInterval(esperarOnline);
   }, 50);
 
-  window.Interior = { get andar() { return inside ? andar : null; }, irPara, andarDe };
+  window.Interior = { get andar() { return inside ? andar : null; }, irPara, andarDe, K, T };
 })();
