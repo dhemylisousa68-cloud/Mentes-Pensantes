@@ -32,7 +32,7 @@ UC.PERSONAGENS = [
 // Nº 7: animação quadro a quadro mandando um beijo (folha com 6 poses de 320 × 500, ancoradas pelos pés).
 // quadros = [até que milissegundo, qual pose]; coracao = trajeto em pixels da pose.
 // Nº 3: dancinha em loop (6 poses de 284 × 470 tocadas na ordem 0,1,2,1,3,4,5,4 a 5 quadros/s).
-// Convite de Tomás (vídeo antes de entrar no mapa). Por enquanto: Nº 3, Nº 7 e Nº 9.
+// Convite de Tomás (vídeo antes de entrar no mapa). Por enquanto: Nº 3, Nº 7, Nº 8 e Nº 9.
 // Sem narração: fica só o som de ambiente do vídeo (para narrar, acrescente voz: 'arquivo' e falaEm: segundo).
 UC.PERSONAGENS.find((p) => p.id === 'cecilia').convite = {
   video: 'assets/convites/p03.mp4',
@@ -42,6 +42,11 @@ UC.PERSONAGENS.find((p) => p.id === 'cecilia').convite = {
 UC.PERSONAGENS.find((p) => p.id === 'isadora').convite = {
   video: 'assets/convites/p07.mp4',
   capa: 'assets/convites/p07-capa.jpg',
+};
+// Nº 8: o ajudante na academia.
+UC.PERSONAGENS.find((p) => p.id === 'lucas').convite = {
+  video: 'assets/convites/p08.mp4',
+  capa: 'assets/convites/p08-capa.jpg',
 };
 // Nº 9: o mensageiro de quatro patas.
 UC.PERSONAGENS.find((p) => p.id === 'maya').convite = {
