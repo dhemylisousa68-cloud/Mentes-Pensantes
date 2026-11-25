@@ -43,7 +43,9 @@
   // ---------- estado ----------
   let sessao = null;
   try { sessao = JSON.parse(sessionStorage.getItem('mp_sala') || 'null'); } catch (e) { /* ignora */ }
-  const sala = sessao && sessao.codigo ? String(sessao.codigo).toUpperCase() : null;
+  // Sem sala (mapa de teste aberto direto): usa uma sala de teste só deste navegador, criada sozinha.
+  let sala = sessao && sessao.codigo ? String(sessao.codigo).toUpperCase() : null;
+  const teste = !sala;
   let est = null, flags = new Set(), vistos = new Set(), relogio = 0, conectado = false, ocupado = false, erroConexao = null;
   let legenda = null; // { texto, quem, ate }
   const avisados = new Set();
@@ -107,7 +109,7 @@
   painel.id = 'inv-diario';
   painel.innerHTML = `<header><b>Diário</b><p class="obj"></p></header>
     <nav><button data-aba="pistas" class="sel">Pistas</button><button data-aba="achados">Achados</button><button data-aba="hip">Hipóteses</button></nav>
-    <div class="corpo"></div><div class="acoes"><button class="encerrar" hidden>Encerrar o dia</button><button class="fechar">Fechar</button></div>`;
+    <div class="corpo"></div><div class="acoes"><button class="recomecar" hidden>Recomeçar teste</button><button class="encerrar" hidden>Encerrar o dia</button><button class="fechar">Fechar</button></div>`;
   const toast = document.createElement('div'); toast.id = 'inv-toast';
   const vinheta = document.createElement('div'); vinheta.id = 'inv-vinheta';
   document.body.append(bt, painel, toast, vinheta);
@@ -116,6 +118,12 @@
   painel.querySelector('.fechar').onclick = () => alternarDiario(false);
   painel.querySelector('nav').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; aba = b.dataset.aba; desenharDiario(); };
   painel.querySelector('.encerrar').onclick = encerrarDia;
+  painel.querySelector('.recomecar').onclick = async () => {
+    if (!confirm('Apagar o progresso deste teste e começar o Dia 1 do zero?')) return;
+    try { await rpc('sair_sala', { p_codigo: sala }); } catch (e) { /* ignora */ }
+    try { localStorage.removeItem('uc_sala_teste'); } catch (e) { /* ignora */ }
+    location.reload();
+  };
   addEventListener('keydown', (e) => {
     if (e.key.toLowerCase() !== 'j' || /INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
     if (document.querySelector('.inv-modal')) return;
@@ -137,8 +145,9 @@
     painel.querySelectorAll('nav button').forEach((b) => b.classList.toggle('sel', b.dataset.aba === aba));
     const corpo = painel.querySelector('.corpo');
     painel.querySelector('header b').textContent = est ? `Dia ${est.dia} — ${est.titulo || ''}` : 'Diário';
-    painel.querySelector('.obj').textContent = !sala ? 'Para investigar, entre no jogo por uma sala (código de 5 letras).'
-      : !est ? 'Conectando…' : (est.objetivo || '');
+    painel.querySelector('.obj').textContent = !sala ? 'Conectando…'
+      : !est ? 'Conectando…' : (teste ? '[Modo teste] ' : '') + (est.objetivo || '');
+    painel.querySelector('.recomecar').hidden = !teste || !est;
     const enc = painel.querySelector('.encerrar');
     enc.hidden = !(est && est.anfitriao && est.dia_concluido < est.dia);
     enc.textContent = est ? `Encerrar o Dia ${est.dia}` : 'Encerrar o dia';
@@ -223,10 +232,19 @@
   }
   let recarga = 0;
   function pedirRecarga() { clearTimeout(recarga); recarga = setTimeout(() => carregar().catch(() => {}), 250); }
+  async function salaDeTeste() {
+    const nome = (() => { try { return localStorage.getItem('uc_nome'); } catch (e) { return null; } })() || 'Teste';
+    let c = null;
+    try { c = localStorage.getItem('uc_sala_teste'); } catch (e) { /* ignora */ }
+    if (c) { try { return await api.rpc('entrar_sala', { p_codigo: c, p_nome: nome }); } catch (e) { /* sumiu: cria outra */ } }
+    c = await api.rpc('criar_sala', { p_nome: nome, p_max: 5 });
+    try { localStorage.setItem('uc_sala_teste', c); } catch (e) { /* ignora */ }
+    return c;
+  }
   async function conectar() {
-    if (!sala) { bt.querySelector('.n').textContent = '–'; return; }
     try {
       await UC.Online.conectar();
+      if (teste) sala = await salaDeTeste();
       await carregar();
       conectado = true;
       UC.Online.cliente.channel(`inv-${sala}-${Math.random().toString(36).slice(2, 7)}`)
@@ -281,7 +299,6 @@
     return melhor;
   }
   async function examinar(p) {
-    if (!sala) { msg.textContent = `Você vê ${p.rot}. Para investigar, entre no jogo por uma sala.`; avisar(msg.textContent, 4500); return; }
     if (!conectado) { msg.textContent = erroConexao || 'Conectando à investigação…'; avisar(msg.textContent, 4500); return; }
     if (ocupado) return; ocupado = true;
     try {

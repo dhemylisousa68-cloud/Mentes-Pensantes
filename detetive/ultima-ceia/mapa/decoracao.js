@@ -306,14 +306,24 @@
     if (v) { if (!modo) ligar(true); montarGrade(); montarRodape(); keys = {}; }
   }
 
+  // botão na tela (além da tecla P)
+  const btDec = document.createElement('button');
+  btDec.textContent = '🧰 Decorar (P)';
+  btDec.style.cssText = 'position:fixed;z-index:27;top:12px;right:262px;padding:8px 12px;background:rgba(30,24,20,.85);color:#f0e2c0;border:1px solid #b08a3e;border-radius:8px;font:14px system-ui;cursor:pointer';
+  btDec.onclick = () => alternar();
+  if (editavel) document.body.append(btDec);
+  function alternar() {
+    if (!editavel) { msg.textContent = 'Para decorar, abra o mapa sem sala ou com ?editar no fim do endereço.'; return; }
+    if (!inside) { msg.textContent = 'Entre na casa para decorar: o modo decoração funciona lá dentro.'; avisoTela(msg.textContent); return; }
+    abrir(!aberto);
+  }
+  function avisoTela(t) { const el = document.getElementById('inv-toast'); if (!el) return; el.textContent = t; el.style.display = 'block'; clearTimeout(avisoTela.t); avisoTela.t = setTimeout(() => { el.style.display = 'none'; }, 3500); }
+
   addEventListener('keydown', (e) => {
-    if (!editavel || /INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
+    if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
     const k = e.key.toLowerCase();
-    if (k === 'p') {
-      if (!inside) { msg.textContent = 'O modo decoração funciona dentro da casa.'; return; }
-      e.preventDefault(); abrir(!aberto); return;
-    }
-    if (!modo) return;
+    if (k === 'p') { e.preventDefault(); alternar(); return; }
+    if (!editavel || !modo) return;
     if (k === 'escape') { e.preventDefault(); e.stopPropagation(); if (aberto) abrir(false); else ligar(false); return; }
     if (aberto) { if (!['p', 'escape'].includes(k)) e.stopPropagation(); return; } // com o inventário aberto, as teclas não andam
     if (/^[1-9]$/.test(e.key)) { sel = +e.key - 1; montarHot(); return; }
