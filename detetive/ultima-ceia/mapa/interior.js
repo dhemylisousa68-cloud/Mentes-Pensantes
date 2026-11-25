@@ -202,8 +202,12 @@
     elevador(A);
     A.escadas = { sobe: def.sobe ? SOBE : null, desce: def.desce ? DESCE : null };
 
-    MOBILIA[nivel](A, salas);
+    // móveis originais (a decoração pode pedir o andar vazio para montar tudo à mão)
+    if (!(window.Decoracao && Decoracao.vazio(nivel))) MOBILIA[nivel](A, salas);
     A.tela = tela;
+    A.base = { fixos: A.fixos.slice(), luzes: A.luzes.slice(), anims: A.anims.slice(), corpos: A.corpos.slice(), assentos: (A.assentosFixos || []).slice() };
+    G = null;
+    if (window.Decoracao) Decoracao.aplicar(A);
     G = null;
     return A;
   }
@@ -863,6 +867,7 @@
     const sx = Math.max(0, Math.floor(vistaX / K)), sy = Math.max(0, Math.floor(vistaY / K));
     const sw = Math.min(NW - sx, Math.ceil(vw / K) + 2), sh = Math.min(NH - sy, Math.ceil(vh / K) + 2);
     ctx.drawImage(A.tela, sx, sy, sw, sh, sx * K, sy * K, sw * K, sh * K);
+    if (window.Decoracao) Decoracao.desenhar(A, ctx, agora);
     animar(A, agora);
     if (window.Investigacao) Investigacao.desenharMundo(A.nivel, ctx, agora);
     // objetos atrás do personagem
@@ -888,6 +893,7 @@
     ctx.fillStyle = 'rgba(20,14,10,.72)'; ctx.fillRect(mx - w / 2, vistaY + 12, w, 28);
     ctx.fillStyle = '#f0e2c0'; ctx.fillText(rot, mx, vistaY + 31);
     if (window.Investigacao) Investigacao.desenharFrente(andar, ctx, vistaX, vistaY, cv.width, cv.height, performance.now());
+    if (window.Decoracao) Decoracao.desenharFrente(A, ctx, vistaX, vistaY);
     if (escuro > 0) { ctx.fillStyle = `rgba(0,0,0,${escuro})`; ctx.fillRect(vistaX, vistaY, cv.width, cv.height); escuro = Math.max(0, escuro - .05); }
     ctx.restore();
   }
@@ -934,5 +940,13 @@
     MapaOnline.__interior = true; clearInterval(esperarOnline);
   }, 50);
 
-  window.Interior = { get andar() { return inside ? andar : null; }, irPara, andarDe, K, T };
+  // para a decoração: as mesmas peças desenhadas aqui, o desenho num contexto qualquer e a câmera
+  const comG = (g, fn) => { const antes = G; G = g; try { return fn(); } finally { G = antes; } };
+  const reconstruir = (n) => { const velho = cache[n]; delete cache[n]; if (velho && velho === cache[andar]) salaAtual = -2; return andarDe(n); };
+  window.Interior = {
+    get andar() { return inside ? andar : null; }, get nivel() { return andar; }, irPara, andarDe, reconstruir, K, T, NW, NH,
+    vista: () => ({ x: vistaX, y: vistaY }), construidos: () => Object.keys(cache).map(Number),
+    comG, D, TIPOS, sprite, MAT,
+    pecas: { mesa, cama, criado, armario, estante, prateleira, bancada, aparador, fogao, lareira, sofa, piano, relogio, escrivaninha, vasoFixo, pia, sanitario, banheira, espelho, carro, caldeira, canos, mesaBilhar, telescopio, cofre, bau, banco, castical, arandela, janela, quadro, tapete, porta, portaoGaragem, vela },
+  };
 })();

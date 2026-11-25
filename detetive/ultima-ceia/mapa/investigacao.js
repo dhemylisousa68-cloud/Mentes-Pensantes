@@ -23,6 +23,8 @@
     { id: 'd1-cartao-eva', andar: -1, x: 120, y: 156, rot: 'um cartão na adega', des: 'cartao' },
     { id: 'd1-garrafa', andar: -1, x: 360, y: 156, rot: 'uma garrafa com etiqueta', des: null },
   ];
+  // a decoração (modo de edição) pode mudar o lugar das pistas
+  const pontos = () => { const ov = (window.Decoracao && Decoracao.pistas()) || {}; return PONTOS.map((p) => (ov[p.id] ? { ...p, ...ov[p.id] } : p)); };
   const ALCANCE = 80;
   // porta do escritório (térreo, blocos 43-44, linhas 21-23) — trancada até a marca "escritorio_aberto"
   const PORTA = { andar: 0, x0: 43 * 16, x1: 45 * 16, y0: 21 * 16, y1: 24 * 16 };
@@ -271,7 +273,7 @@
     if (!inside || !window.Interior) return null;
     const a = Interior.andar;
     let melhor = null, d = Infinity;
-    for (const p of PONTOS) {
+    for (const p of pontos()) {
       if (p.andar !== a) continue;
       const dd = Math.hypot(x - p.x, y - p.y);
       if (dd < (p.raio || ALCANCE) && dd < d) { d = dd; melhor = p; }
@@ -365,7 +367,7 @@
       }
     }
     // objetos pequenos dos pontos de investigação
-    for (const p of PONTOS) {
+    for (const p of pontos()) {
       if (p.andar !== andar || !p.des) continue;
       const X = p.x, Y = p.y;
       if (p.des === 'cartao') { g.fillStyle = '#1e130c'; g.fillRect(X - 9, Y - 7, 18, 13); g.fillStyle = '#f4ecd8'; g.fillRect(X - 7, Y - 5, 14, 9); g.fillStyle = '#8a2a30'; g.fillRect(X - 5, Y - 2, 10, 2); }
@@ -379,7 +381,7 @@
   function desenharFrente(andar, g, vx, vy, vw, vh, t) {
     if (est) roteiro();
     // brilho de "dá para examinar" perto do personagem
-    for (const p of PONTOS) {
+    for (const p of pontos()) {
       if (p.andar !== andar) continue;
       const d = Math.hypot(x - p.x, y - p.y);
       if (d > 150) continue;
