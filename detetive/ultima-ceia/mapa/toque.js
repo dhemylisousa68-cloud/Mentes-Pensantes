@@ -1,6 +1,6 @@
 // Controles de toque para jogar o mapa no celular.
 // - Direcional (joystick) no canto esquerdo: anda nas 8 direções; empurrando até a borda, corre.
-// - Botões à direita: "E" (interagir: portão, porta, sentar, pegar) e lupa (investigar).
+// - Botões à direita: "E" (interagir e pegar), lupa (investigar), ⤒ (pular), 🪑 (sentar/levantar) e 🍴 (comer, com alimento na mão).
 // Aparece sozinho em telas de toque; no computador continua o teclado.
 // Usa as variáveis do mapa.js: keys, pick(), investigate().
 (() => {
@@ -14,7 +14,14 @@
     .toque-pino { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
       background: radial-gradient(circle at 40% 35%, #e6cf9c, #a3844f); box-shadow: 0 4px 10px rgba(0, 0, 0, .5); transition: transform .08s; }
     .toque-dir.ativo .toque-pino { transition: none; }
-    .toque-botoes { right: max(16px, env(safe-area-inset-right)); bottom: max(22px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: auto auto; gap: 14px; align-items: end; }
+    .toque-botoes { right: max(16px, env(safe-area-inset-right)); bottom: max(22px, env(safe-area-inset-bottom)); display: grid;
+      grid-template-columns: auto auto auto; grid-template-areas: ". sentar comer" "lupa pular e"; gap: 12px; align-items: end; justify-items: center; }
+    .toque-botoes .e { grid-area: e; } .toque-botoes .lupa { grid-area: lupa; } .toque-botoes .pular { grid-area: pular; }
+    .toque-botoes .sentar { grid-area: sentar; } .toque-botoes .comer { grid-area: comer; }
+    .toque-botoes button.pequeno { width: 50px; height: 50px; font-size: 20px; background: radial-gradient(circle at 40% 35%, #5a4a30, #2e2416); }
+    .toque-botoes button.pular { background: radial-gradient(circle at 40% 35%, #3a5a7a, #1a2a3e); font-size: 24px; }
+    .toque-botoes button.comer { background: radial-gradient(circle at 40% 35%, #8a6a2a, #4a3410); }
+    .toque-botoes button.comer[hidden] { display: block; visibility: hidden; }
     .toque-botoes button { width: 64px; height: 64px; border-radius: 50%; padding: 0; font: 700 22px system-ui; color: #fff4df;
       background: radial-gradient(circle at 40% 35%, #8c2a3d, #4e1420); border: 2px solid rgba(240, 207, 134, .6); box-shadow: 0 4px 10px rgba(0, 0, 0, .5); }
     .toque-botoes button.lupa { width: 54px; height: 54px; font-size: 22px; background: radial-gradient(circle at 40% 35%, #3f5148, #1f2a25); margin-bottom: 30px; }
@@ -56,10 +63,21 @@
   // ---------- botões ----------
   const bts = document.createElement('div');
   bts.className = 'toque toque-botoes';
-  bts.innerHTML = '<button type="button" class="lupa" aria-label="Investigar">🔍</button><button type="button" class="e" aria-label="Interagir">E</button>';
+  bts.innerHTML = '<button type="button" class="sentar pequeno" aria-label="Sentar ou levantar">🪑</button>'
+    + '<button type="button" class="comer pequeno" aria-label="Comer" hidden>🍴</button>'
+    + '<button type="button" class="lupa" aria-label="Investigar">🔍</button>'
+    + '<button type="button" class="pular" aria-label="Pular">⤒</button>'
+    + '<button type="button" class="e" aria-label="Interagir">E</button>';
   document.body.appendChild(bts);
-  bts.querySelector('.e').addEventListener('pointerdown', (e) => { e.preventDefault(); pick(); });
-  bts.querySelector('.lupa').addEventListener('pointerdown', (e) => { e.preventDefault(); investigate(); });
+  const toqueEm = (sel, fn) => bts.querySelector(sel).addEventListener('pointerdown', (e) => { e.preventDefault(); fn(); });
+  toqueEm('.e', () => pick());
+  toqueEm('.lupa', () => investigate());
+  toqueEm('.pular', () => window.Controles && Controles.pular());     // o mesmo que Espaço
+  toqueEm('.sentar', () => window.Controles && Controles.sentar());   // o mesmo que Ctrl
+  toqueEm('.comer', () => window.Comida && Comida.comer());           // o mesmo que Q
+  // o botão de comer só aparece com um alimento na mão
+  const btComer = bts.querySelector('.comer');
+  setInterval(() => { btComer.hidden = !(window.Comida && Comida.naMao); }, 200);
 
   // evita o zoom por toque duplo e a rolagem da página enquanto joga
   document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });

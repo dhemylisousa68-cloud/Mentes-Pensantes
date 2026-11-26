@@ -174,5 +174,5 @@
     g.restore();
   }
 
-  window.Comida = { desenhar, get naMao() { return mao; }, get comendo() { return !!comendo; } };
+  window.Comida = { desenhar, get naMao() { return mao; }, get comendo() { return !!comendo; }, comer: () => comer() };
 })();
