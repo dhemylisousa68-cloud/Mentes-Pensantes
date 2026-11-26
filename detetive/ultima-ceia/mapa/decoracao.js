@@ -235,7 +235,16 @@
       if (it.img && p.s) s = { ...s, w: s.w * p.s, h: s.h * p.s }; // tamanho escolhido (Shift+scroll)
       poe(A, s, Math.round(p.x - s.w / 2), Math.round(p.y - s.h / 2), it.camada ?? 1, ref);
     });
-    A.decor.sort((a, b2) => a.camada - b2.camada || (a.y0 + a.h) - (b2.y0 + b2.h));
+    // profundidade (onde o móvel "toca o chão"): decide se fica atrás ou na frente do boneco.
+    // Tapetes ficam sempre no chão; o que está em cima de um móvel (alimentos) usa a profundidade dele.
+    for (const d of A.decor) d.prof = d.camada === 0 ? -1e9 : d.y0 + d.h;
+    for (const d of A.decor) {
+      if (d.camada !== 2) continue;
+      const cx = d.x0 + d.w / 2, cy = d.y0 + d.h / 2;
+      for (const m of A.decor) if (m.camada === 1 && cx >= m.x0 && cx < m.x0 + m.w && cy >= m.y0 && cy < m.y0 + m.h) d.prof = Math.max(d.prof === d.y0 + d.h ? -1e9 : d.prof, m.y0 + m.h);
+      if (d.prof < -1e8) d.prof = d.y0 + d.h;
+    }
+    A.decor.sort((a, b2) => a.prof - b2.prof || a.camada - b2.camada);
   }
   // o que está embaixo do mouse (objetos com física primeiro, depois móveis, tapetes por último)
   function acharEmbaixo(A, wx, wy) {
@@ -251,10 +260,19 @@
     }
     return null;
   }
+  // atrás do boneco: o que toca o chão acima dos pés dele (antes de desenhar os personagens)
   function desenhar(A, g) {
     if (!A.decor) return;
     g.imageSmoothingEnabled = false;
-    for (const d of A.decor) g.drawImage(d.can, d.x0 * K, d.y0 * K, d.w * K, d.h * K);
+    const pe = y / K;
+    for (const d of A.decor) if (d.prof <= pe) g.drawImage(d.can, d.x0 * K, d.y0 * K, d.w * K, d.h * K);
+  }
+  // na frente do boneco: o que toca o chão abaixo dos pés (ex.: a mesa quando ele senta atrás dela)
+  function desenharNaFrente(A, g) {
+    if (!A.decor) return;
+    g.imageSmoothingEnabled = false;
+    const pe = y / K;
+    for (const d of A.decor) if (d.prof > pe) g.drawImage(d.can, d.x0 * K, d.y0 * K, d.w * K, d.h * K);
   }
 
   // ---------- editor ----------
@@ -595,7 +613,7 @@
     itemDe(n, idx) { const p = ((dados.andares[n] || {}).itens || [])[idx]; return p ? { it: CAT.get(p.t), p } : null; },
     vazio: (n) => !!(dados.andares[n] && dados.andares[n].vazio),
     pistas: () => dados.pistas,
-    aplicar, desenhar, desenharFrente, CATALOGO: C,
+    aplicar, desenhar, desenharNaFrente, desenharFrente, CATALOGO: C,
     get modo() { return modo; }, get dados() { return dados; },
   };
 })();

@@ -159,7 +159,7 @@
     }
     g.globalAlpha = 1;
     // dica
-    if (!mao && !comendo && !(window.Decoracao && Decoracao.modo)) {
+    if (!mao && !comendo && !seated && !(window.Decoracao && Decoracao.modo)) {
       const d = alimentoPerto();
       if (d) {
         g.font = '13px system-ui'; g.textAlign = 'center';

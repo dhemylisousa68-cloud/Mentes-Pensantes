@@ -432,7 +432,7 @@
       g.save(); g.globalAlpha = Math.max(0, a); g.fillStyle = jaVisto ? '#a8977c' : '#ffd770';
       g.beginPath(); g.moveTo(p.x, Y - s * 2); g.lineTo(p.x + s, Y); g.lineTo(p.x, Y + s * 2); g.lineTo(p.x - s, Y); g.closePath(); g.fill(); g.restore();
     }
-    const perto = pontoPerto();
+    const perto = seated ? null : pontoPerto(); // sentado: sem dicas por cima do boneco
     if (perto) {
       g.save(); g.font = '13px system-ui'; g.textAlign = 'center';
       const txt = `E: examinar ${perto.rot}`, w = g.measureText(txt).width + 16;

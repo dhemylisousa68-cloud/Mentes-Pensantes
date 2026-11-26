@@ -858,11 +858,13 @@
   }
 
   // ---------- desenho ----------
-  function desenharCorpo(c) {
+  // deDe: desenha só a parte de baixo do sprite a partir dessa linha (encosto da cadeira na frente de quem senta)
+  function desenharCorpo(c, deDe = 0) {
     const t = TIPOS[c.tipo], sp = sprite(c.tipo, c.var1);
     const sx = Math.round(c.x - t.w * K / 2), sy = Math.round(c.y + c.h / 2 - t.h * K - c.z);
     if (c.z > 0) { ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(c.x, c.y + c.h / 2 - 2, c.w / 2.2, 4, 0, 0, 7); ctx.fill(); }
-    ctx.drawImage(sp, sx, sy, t.w * K, t.h * K);
+    if (deDe) ctx.drawImage(sp, 0, deDe, t.w, t.h - deDe, sx, sy + deDe * K, t.w * K, (t.h - deDe) * K);
+    else ctx.drawImage(sp, sx, sy, t.w * K, t.h * K);
   }
   function animar(A, t) {
     const z = t / 1000;
@@ -957,8 +959,7 @@
     animar(A, agora);
     if (window.Investigacao) Investigacao.desenharMundo(A.nivel, ctx, agora);
     // objetos atrás do personagem
-    const atras = (c) => c.y <= y || (seated && Math.hypot(c.x - x, c.y - y) < 40);
-    for (const c of A.corpos.filter((c) => c !== segurado && atras(c)).sort((a, b) => a.y - b.y)) desenharCorpo(c);
+    for (const c of A.corpos.filter((c) => c !== segurado && corpoAtras(c)).sort((a, b) => a.y - b.y)) desenharCorpo(c);
     iluminar(A, agora, vistaX, vistaY, vw, vh);
 
     // nome do cômodo
@@ -967,9 +968,17 @@
     enviarFisica(agora);
   }
   // por cima do personagem: objetos à frente, objeto segurado, rótulo do andar e escurecimento das transições
+  // a cadeira em que o boneco está sentado: atrás dele, menos quando ele senta de costas (aí o encosto fica na frente)
+  function corpoAtras(c) {
+    if (seated && Math.hypot(c.x - x, c.y - y) < 40) return true;
+    return c.y <= y;
+  }
   function desenharFrente() {
     const A = cache[andar]; if (!A) return;
-    for (const c of A.corpos.filter((c) => c !== segurado && !(c.y <= y || (seated && Math.hypot(c.x - x, c.y - y) < 40))).sort((a, b) => a.y - b.y)) desenharCorpo(c);
+    if (window.Decoracao) Decoracao.desenharNaFrente(A, ctx); // móveis que ficam na frente do boneco (ex.: a mesa)
+    for (const c of A.corpos.filter((c) => c !== segurado && !corpoAtras(c)).sort((a, b) => a.y - b.y)) desenharCorpo(c);
+    // sentado de costas (cadeira do lado de cá da mesa): o encosto aparece na frente do corpo
+    if (seated && dir === 3) { const c = A.corpos.find((o) => o.tipo === 'cadeiraB' && Math.hypot(o.x - x, o.y - y) < 40); if (c) desenharCorpo(c, 6); }
     if (segurado) desenharCorpo(segurado);
     ctx.save();
     ctx.font = 'bold 15px Georgia'; ctx.textAlign = 'center';
