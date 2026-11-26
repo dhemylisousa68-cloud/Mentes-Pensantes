@@ -458,7 +458,9 @@
         if (q.i >= r.i) break;
         if (!q.peca || q.nome === 'tapete') continue;
         const b = q.bb;
-        if (cx >= b.x0 && cx < b.x0 + b.w && cy >= b.y0 && cy < b.y0 + b.h && area(b) > 2 * area(r.bb) && (!pai || area(b) < area(pai.bb))) pai = q;
+        // pixels soltos (toalha, pratos…) vão com o móvel que os contém; móveis pequenos só dentro de um bem maior
+        const cabeDentro = SOLTOS.has(r.nome) ? area(b) > area(r.bb) : area(b) > 2 * area(r.bb);
+        if (cx >= b.x0 && cx < b.x0 + b.w && cy >= b.y0 && cy < b.y0 + b.h && cabeDentro && (!pai || area(b) < area(pai.bb))) pai = q;
       }
       if (pai) { while (pai.pai) pai = pai.pai; r.pai = pai; (pai.filhos || (pai.filhos = [])).push(r); }
     }

@@ -113,11 +113,41 @@
     return ((window.Investigacao && Investigacao.PONTOS) || []).map((p) => ({ id: 'pista:' + p.id, nome: p.rot + ` (${p.id})`, cat: 'Pistas', pista: p.id }));
   }
   const item = (id) => CAT.get(id) || itensDePistas().find((p) => p.id === id);
-  const CATEGORIAS = ['Mesas', 'Quarto', 'Sala', 'Cozinha e banho', 'Decoração', 'Tapetes', 'Outros', 'Com física', 'Pistas'];
+  const CATEGORIAS = ['Mesas', 'Quarto', 'Sala', 'Cozinha e banho', 'Alimentos', 'Decoração', 'Tapetes', 'Outros', 'Com física', 'Pistas'];
+
+  // ---------- itens em imagem (pasta itens/): alimentos etc., com subcategorias ----------
+  // Ficam por cima dos móveis (camada 2), sem colisão: dá para pôr em cima das mesas e bancadas.
+  const imagens = new Map(); // id → { img, ok, esperando }
+  function carregarImagem(it) {
+    let r = imagens.get(it.id);
+    if (r) return r;
+    r = { img: new Image(), ok: false };
+    imagens.set(it.id, r);
+    r.img.onload = () => { r.ok = true; agendarRedesenho(); };
+    r.img.src = it.img;
+    return r;
+  }
+  let redesenho = 0;
+  function agendarRedesenho() {
+    clearTimeout(redesenho);
+    redesenho = setTimeout(() => { reaplicarTudo(); if (aberto) montarGrade(); montarHot(); }, 120);
+  }
+  fetch('itens/alimentos.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : [])).then((lista) => {
+    for (const grupo of lista) for (const i of grupo.itens) {
+      const id = `al-${grupo.pasta}-${i.n}`;
+      const it = { id, nome: `${grupo.sub} ${String(i.n).padStart(2, '0')}`, cat: 'Alimentos', sub: grupo.sub, img: `itens/alimentos/${grupo.pasta}/${String(i.n).padStart(2, '0')}.png`, w: i.w / K, h: i.h / K, camada: 2, parede: true, semGiro: true };
+      C.push(it); CAT.set(id, it);
+    }
+    agendarRedesenho();
+  }).catch(() => {});
 
   // ---------- desenho de uma peça em um sprite (recortado) ----------
   const cachePeca = new Map();
   function render(it) {
+    if (it.img) { // imagem pronta: o desenho já está na resolução do mundo (w, h em blocos do mapa)
+      const r = carregarImagem(it);
+      return r.ok ? { can: r.img, w: it.w, h: it.h, fixos: [], luzes: [], anims: [] } : null;
+    }
     if (cachePeca.has(it.id)) return cachePeca.get(it.id);
     const W = 280, H = 220, OX = 40, OY = 70;
     const c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -142,7 +172,7 @@
   }
   // gira 90° no sentido horário, r vezes (sprite, colisores, luzes e animações)
   const cacheRot = new WeakMap();
-  const girada = (it, r) => girar(render(it), r);
+  const girada = (it, r) => { const s = render(it); return !s ? null : it.semGiro ? s : girar(s, r); };
   function girar(base, r) {
     let m = cacheRot.get(base); if (!m) { m = []; cacheRot.set(base, m); }
     if (m[r]) return m[r];
@@ -199,7 +229,7 @@
         const c = Interior.D(A, tipo, Math.round(p.x - t.w / 2), Math.round(p.y - t.h / 2), it.v);
         c.id = `${n}:d${idx}`; c.ref = ref; return;
       }
-      const s = girada(it, p.r || 0);
+      const s = girada(it, p.r || 0); if (!s) return; // imagem ainda carregando (redesenha ao chegar)
       poe(A, s, Math.round(p.x - s.w / 2), Math.round(p.y - s.h / 2), it.camada ?? 1, ref);
     });
     A.decor.sort((a, b2) => a.camada - b2.camada || (a.y0 + a.h) - (b2.y0 + b2.h));
@@ -212,7 +242,7 @@
       const t = Interior.TIPOS[c.tipo], sx = c.x - t.w * K / 2, sy = c.y + c.h / 2 - t.h * K - c.z;
       if (wx >= sx - 4 && wx <= sx + t.w * K + 4 && wy >= sy - 4 && wy <= sy + t.h * K + 4) return { ref: c.ref, corpo: c };
     }
-    for (const camada of [1, 0]) for (let i = (A.decor || []).length - 1; i >= 0; i--) {
+    for (const camada of [2, 1, 0]) for (let i = (A.decor || []).length - 1; i >= 0; i--) {
       const d = A.decor[i]; if (d.camada !== camada || !d.ref) continue;
       if (nx >= d.x0 && nx < d.x0 + d.w && ny >= d.y0 && ny < d.y0 + d.h) return { ref: d.ref, decor: d };
     }
@@ -225,7 +255,7 @@
   }
 
   // ---------- editor ----------
-  let modo = false, aberto = false, sel = 0, rot = 0, mouse = null, cat = 'Mesas';
+  let modo = false, aberto = false, sel = 0, rot = 0, mouse = null, cat = 'Mesas', sub = null;
   let hotbar = Array(9).fill(null);
   try { const h = JSON.parse(localStorage.getItem('uc_hotbar') || 'null'); if (Array.isArray(h)) hotbar = h.slice(0, 9).concat(Array(9).fill(null)).slice(0, 9); } catch (e) { /* ignora */ }
   const desfazer = [];
@@ -236,6 +266,10 @@
   #dec-inv header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #4a3b2b}
   #dec-inv header b{font:18px Georgia;color:#e8bd70}
   #dec-inv nav{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px}
+  #dec-inv .subs{display:flex;flex-wrap:wrap;gap:5px;padding:0 12px 6px}
+  #dec-inv .subs:empty{display:none}
+  #dec-inv .subs button{padding:5px 9px;font-size:12px;background:#2c241d}
+  #dec-inv .subs button.sel{background:#4a3b2b;border-color:#e8bd70}
   #dec-inv button{padding:7px 11px;background:#3a3028;color:#f0e2c0;border:1px solid #8c7552;border-radius:6px;font:13px system-ui;cursor:pointer}
   #dec-inv nav button.sel{background:#6a5530;border-color:#e8bd70}
   #dec-inv .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;padding:6px 12px 12px;overflow:auto}
@@ -256,14 +290,14 @@
   const inv = document.createElement('section'); inv.id = 'dec-inv';
   inv.innerHTML = `<header><b>Inventário · decoração</b><button class="x">Fechar (P)</button></header>
     <div class="dica">Clique num item para pô-lo no espaço escolhido da barra. Na casa: clique coloca · scroll ou R gira · botão direito remove · Ctrl+Z desfaz.</div>
-    <nav></nav><div class="grade"></div>
+    <nav></nav><div class="subs"></div><div class="grade"></div>
     <footer><label><input type="checkbox" class="esvaziar"> Andar vazio (sem os móveis originais)</label>
     <button class="limpar">Limpar andar</button><button class="exportar">Exportar</button><button class="importar">Importar</button><button class="publicada">Voltar à publicada</button>
     <input type="file" accept=".json,application/json" hidden></footer>`;
   const hot = document.createElement('div'); hot.id = 'dec-hot';
   document.body.append(inv, hot);
   inv.querySelector('.x').onclick = () => abrir(false);
-  inv.querySelector('nav').onclick = (e) => { const b = e.target.closest('button'); if (b) { cat = b.dataset.cat; montarGrade(); } };
+  inv.querySelector('nav').onclick = (e) => { const b = e.target.closest('button'); if (b) { cat = b.dataset.cat; sub = null; montarGrade(); } };
   inv.querySelector('.esvaziar').onchange = (e) => {
     const n = Interior.nivel, antes = JSON.stringify(dados.andares);
     andarDados(n).vazio = e.target.checked; salvar(); reaplicarTudo(antes);
@@ -298,7 +332,9 @@
     const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
     let can;
     if (it.pista) { g.fillStyle = '#ffd770'; g.beginPath(); g.moveTo(tam / 2, 8); g.lineTo(tam - 16, tam / 2); g.lineTo(tam / 2, tam - 8); g.lineTo(16, tam / 2); g.closePath(); g.fill(); return c; }
-    can = it.corpo ? spriteCorpo(it, 0).can : render(it).can;
+    const rr = it.corpo ? null : render(it);
+    if (!it.corpo && !rr) { g.fillStyle = '#3a3028'; g.fillRect(tam / 2 - 6, tam / 2 - 6, 12, 12); return c; } // imagem chegando
+    can = it.corpo ? spriteCorpo(it, 0).can : rr.can;
     const k = Math.max(1, Math.floor(Math.min((tam - 4) / can.width, (tam - 4) / can.height))) || 1;
     const esc = Math.min(k, (tam - 4) / Math.max(can.width, can.height));
     const w = can.width * esc, h = can.height * esc;
@@ -311,7 +347,15 @@
   function montarGrade() {
     montarAbas();
     const grade = inv.querySelector('.grade'); grade.innerHTML = '';
-    const lista = cat === 'Pistas' ? itensDePistas() : C.filter((c) => c.cat === cat);
+    const todos = cat === 'Pistas' ? itensDePistas() : C.filter((c) => c.cat === cat);
+    // subcategorias (ex.: Alimentos → Doces clássicos, Cafeteria…)
+    const subs = [...new Set(todos.map((c) => c.sub).filter(Boolean))];
+    const caixaSubs = inv.querySelector('.subs'); caixaSubs.innerHTML = '';
+    if (subs.length) for (const s of [null, ...subs]) {
+      const b = document.createElement('button'); b.textContent = s || 'Todos'; if (s === sub) b.className = 'sel';
+      b.onclick = () => { sub = s; montarGrade(); }; caixaSubs.append(b);
+    }
+    const lista = sub ? todos.filter((c) => c.sub === sub) : todos;
     for (const it of lista) {
       const b = document.createElement('button'); b.className = 'it'; b.title = it.nome;
       b.append(miniatura(it)); const s = document.createElement('span'); s.textContent = it.nome; b.append(s);
@@ -510,7 +554,7 @@
       if (mao.base) { const s = girar(mao.base, rot); can = s.can; w = s.w; h = s.h; fixos = s.fixos; }
       else if (mao.corpoTipo) { can = Interior.sprite(mao.corpoTipo.tipo, mao.corpoTipo.v); const t = Interior.TIPOS[mao.corpoTipo.tipo]; w = t.w; h = t.h; fixos = [[0, h - t.fh, w, t.fh]]; }
       else if (mao.item.corpo) { const s = spriteCorpo(mao.item, rot); can = s.can; w = s.t.w; h = s.t.h; fixos = [[0, h - s.t.fh, w, s.t.fh]]; }
-      else { const s = girada(mao.item, rot); can = s.can; w = s.w; h = s.h; fixos = s.fixos; }
+      else { const s = girada(mao.item, rot); if (!s) { g.restore(); return; } can = s.can; w = s.w; h = s.h; fixos = s.fixos; }
       const x0 = Math.round(mouse.nx - w / 2), y0 = Math.round(mouse.ny - h / 2);
       const ok = parede || cabe(A, fixos, x0, y0);
       g.globalAlpha = .62;
