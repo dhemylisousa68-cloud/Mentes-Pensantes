@@ -162,7 +162,7 @@
     if (aba === 'pistas' || aba === 'achados') {
       const lista = ach.filter((a) => (aba === 'pistas' ? !!a.pista : !a.pista));
       corpo.innerHTML = lista.length ? lista.map((a, i) => `<button class="item" data-i="${ach.indexOf(a)}">${a.pista ? `<span class="pista">${esc(a.pista)}</span>` : ''}${esc(a.titulo)}<small>${esc(a.resumo)} · encontrado por ${esc(a.por)}</small></button>`).join('')
-        : `<p class="vazio">${aba === 'pistas' ? 'Nenhuma pista ainda. Explorem a casa e usem Espaço perto das coisas.' : 'Nada por aqui ainda.'}</p>`;
+        : `<p class="vazio">${aba === 'pistas' ? 'Nenhuma pista ainda. Explorem a casa e usem E perto das coisas.' : 'Nada por aqui ainda.'}</p>`;
       corpo.querySelectorAll('.item').forEach((b) => { b.onclick = () => ficha(ach[+b.dataset.i]); });
     } else {
       const hs = est.hipoteses || [];
@@ -435,7 +435,7 @@
     const perto = pontoPerto();
     if (perto) {
       g.save(); g.font = '13px system-ui'; g.textAlign = 'center';
-      const txt = `E ou Espaço: examinar ${perto.rot}`, w = g.measureText(txt).width + 16;
+      const txt = `E: examinar ${perto.rot}`, w = g.measureText(txt).width + 16;
       g.fillStyle = 'rgba(20,14,10,.8)'; g.fillRect(x - w / 2, y + 14, w, 22); g.fillStyle = '#f0e2c0'; g.fillText(txt, x, y + 29); g.restore();
     }
     // apagão (cobre tudo, inclusive os personagens)

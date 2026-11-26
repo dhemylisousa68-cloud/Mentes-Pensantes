@@ -1002,22 +1002,30 @@
     if (Math.hypot(x - ELEV.x, y - ELEV.y) < 80) { abrirElevador(); return; }
     if (andar === 0 && Math.hypot(x - 24 * 48, y - 41 * 48) < 90) { sair(768, 405); return; }
     if (andar === -1 && Math.hypot(x - 6.5 * 48, y - 41 * 48) < 120) { sair(225, 448); return; }
-    // sentar: cadeiras (onde estiverem), poltronas, banquetas e sofá
+    // pegar: objeto pequeno mais perto (sentar agora é no Ctrl, para não brigar com o E)
+    let peg = null, dp = 56;
+    for (const c of A.corpos) if (c.peg && !c.seg && c.z < 20) { const d = Math.hypot(x - c.x, y - c.y); if (d < dp) { dp = d; peg = c; } }
+    if (peg) { pegar(peg); return; }
+    msg.textContent = assentoPerto() ? 'Ctrl: sentar' : 'Nada para usar aqui. F: investigar';
+  };
+  // sentar: cadeiras (onde estiverem), poltronas, banquetas e sofá
+  function assentoPerto() {
+    const A = andarDe(andar);
     let melhor = null, dist = 64;
     for (const c of A.corpos) if (c.sentar && c.z === 0 && !c.seg) { const d = Math.hypot(x - c.x, y - c.y); if (d < dist) { dist = d; melhor = c; } }
     for (const [sx, sy, sd] of A.assentosFixos || []) { const d = Math.hypot(x - sx, y - sy); if (d < dist) { dist = d; melhor = { fixo: [sx, sy, sd] }; } }
-    // pegar: objeto pequeno mais perto
-    let peg = null, dp = 56;
-    for (const c of A.corpos) if (c.peg && !c.seg && c.z < 20) { const d = Math.hypot(x - c.x, y - c.y); if (d < dp) { dp = d; peg = c; } }
-    if (peg && (!melhor || dp < dist)) { pegar(peg); return; }
-    if (melhor) {
-      seatReturn = [x, y];
-      if (melhor.fixo) { [x, y, dir] = melhor.fixo; }
-      else { const [ox, oy, d] = melhor.sentar; x = melhor.x + ox * K; y = melhor.y + oy * K; dir = d; melhor.vx = melhor.vy = 0; }
-      phase = 0; seated = true; msg.textContent = 'Sentado — E para levantar'; return;
-    }
-    msg.textContent = 'Nada para usar aqui. Espaço: investigar';
-  };
+    return melhor;
+  }
+  function sentarOuLevantar() {
+    if (seated) { seated = false;[x, y] = seatReturn; msg.textContent = 'Levantou'; return true; }
+    if (segurado) { msg.textContent = 'Solte o objeto antes de sentar (E).'; return true; }
+    const melhor = assentoPerto();
+    if (!melhor) { msg.textContent = 'Nenhum lugar para sentar aqui.'; return false; }
+    seatReturn = [x, y];
+    if (melhor.fixo) { [x, y, dir] = melhor.fixo; }
+    else { const [ox, oy, d] = melhor.sentar; x = melhor.x + ox * K; y = melhor.y + oy * K; dir = d; melhor.vx = melhor.vy = 0; }
+    phase = 0; seated = true; msg.textContent = 'Sentado — Ctrl para levantar'; return true;
+  }
   act.onclick = () => pick();
   // objetos da frente: desenhados logo depois dos outros jogadores
   const esperarOnline = setInterval(() => {
@@ -1033,7 +1041,7 @@
   window.Interior = {
     get andar() { return inside ? andar : null; }, get nivel() { return andar; }, irPara, andarDe, reconstruir, K, T, NW, NH,
     vista: () => ({ x: vistaX, y: vistaY }), construidos: () => Object.keys(cache).map(Number),
-    comG, D, TIPOS, sprite, MAT,
+    comG, D, TIPOS, sprite, MAT, sentar: () => sentarOuLevantar(),
     pecas: { mesa, cama, criado, armario, estante, prateleira, bancada, aparador, fogao, lareira, sofa, piano, relogio, escrivaninha, vasoFixo, pia, sanitario, banheira, espelho, carro, caldeira, canos, mesaBilhar, telescopio, cofre, bau, banco, castical, arandela, janela, quadro, tapete, porta, portaoGaragem, vela },
   };
 })();

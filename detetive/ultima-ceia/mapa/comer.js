@@ -1,7 +1,7 @@
 // Comer: pegar um alimento da mesa (E), levar à boca e comer em três mordidas, com farelos caindo.
 //  E perto de um alimento ... pega (fica na mão do boneco)
-//  E com o alimento na mão .. come (o boneco vira de frente, leva à boca, 3 mordidas e farelos)
-//  Q ........................ devolve o alimento ao lugar
+//  Q com o alimento na mão .. come (o boneco vira de frente, leva à boca, 3 mordidas e farelos)
+//  E com o alimento na mão .. devolve o alimento ao lugar
 // Os outros jogadores veem o alimento sumir da mesa, na mão de quem pegou e a pessoa comendo.
 // Usa: x, y, dir, inside, keys, msg, size, pick (mapa.js), Interior, Decoracao e MapaOnline.
 (() => {
@@ -39,7 +39,7 @@
     mao = { n, idx, img: d.can, w: d.w * K, h: d.h * K };
     Decoracao.ocultar(n, idx, true);
     mandar({ a: 'pegar', n, i: idx });
-    msg.textContent = `Na mão: ${nomeDe(n, idx)} — E come · Q devolve`;
+    msg.textContent = `Na mão: ${nomeDe(n, idx)} — Q come · E devolve`;
   }
   function devolver() {
     if (!mao) return;
@@ -60,14 +60,14 @@
   pick = function () {
     if (inside && !(window.Decoracao && Decoracao.modo)) {
       if (comendo) return;
-      if (mao) return comer();
+      if (mao) return devolver();
       const d = alimentoPerto(); if (d) return pegar(d);
     }
     return pegarAntes();
   };
   addEventListener('keydown', (e) => {
     if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
-    if (e.key.toLowerCase() === 'q' && mao) { e.preventDefault(); devolver(); }
+    if (e.key.toLowerCase() === 'q' && mao && !comendo) { e.preventDefault(); comer(); }
   });
 
   // ---------- outros jogadores ----------
@@ -168,11 +168,11 @@
       }
     } else if (mao) {
       g.font = '13px system-ui'; g.textAlign = 'center';
-      const txt = 'E: comer · Q: devolver', w = g.measureText(txt).width + 16;
+      const txt = 'Q: comer · E: devolver', w = g.measureText(txt).width + 16;
       g.fillStyle = 'rgba(20,14,10,.8)'; g.fillRect(x - w / 2, y + 40, w, 22); g.fillStyle = '#f0e2c0'; g.fillText(txt, x, y + 55);
     }
     g.restore();
   }
 
-  window.Comida = { desenhar, get naMao() { return mao; } };
+  window.Comida = { desenhar, get naMao() { return mao; }, get comendo() { return !!comendo; } };
 })();

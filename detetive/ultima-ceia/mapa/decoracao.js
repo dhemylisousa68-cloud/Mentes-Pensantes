@@ -464,6 +464,8 @@
     if ((k === 'delete' || k === 'backspace' || k === 'x') && movendo) { e.preventDefault(); e.stopPropagation(); excluir(); return; }
     if (/^[1-9]$/.test(e.key)) { cancelar(); sel = +e.key - 1; montarHot(); return; }
     if (k === 'r') { rot = (rot + 1) % 4; return; }
+    // tamanho do alimento: + / − (além de Shift+scroll)
+    if (k === '+' || k === '=' || k === '-' || k === '_') { e.preventDefault(); mudarEscala(k === '+' || k === '=' ? 0.1 : -0.1); return; }
     if (k === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); cancelar(); voltar(); }
   }, true);
 
@@ -479,10 +481,16 @@
   }
   cv.addEventListener('mousemove', (e) => { if (modo) mouse = posMouse(e); });
   cv.addEventListener('mouseleave', () => { mouse = null; });
+  function mudarEscala(passo) {
+    const mao = naMao();
+    if (!mao || !(mao.item && mao.item.img)) { msg.textContent = 'O tamanho muda só nos alimentos (escolha um na barra ou pegue um com o botão direito).'; return; }
+    escala = Math.max(0.4, Math.min(2.5, Math.round((escala + passo) * 10) / 10));
+    msg.textContent = 'Tamanho: ' + Math.round(escala * 100) + '%';
+  }
   cv.addEventListener('wheel', (e) => {
     if (!modo || aberto) return; e.preventDefault();
     const d = e.deltaY || e.deltaX; // com Shift, alguns navegadores mandam a rolagem na horizontal
-    if (e.shiftKey) { escala = Math.max(0.4, Math.min(2.5, Math.round((escala + (d > 0 ? -0.1 : 0.1)) * 10) / 10)); msg.textContent = 'Tamanho: ' + Math.round(escala * 100) + '%'; return; }
+    if (e.shiftKey || keys.shift) { mudarEscala(d > 0 ? -0.1 : 0.1); return; }
     rot = (rot + (d > 0 ? 1 : 3)) % 4;
   }, { passive: false });
   cv.addEventListener('contextmenu', (e) => { if (modo) e.preventDefault(); });
