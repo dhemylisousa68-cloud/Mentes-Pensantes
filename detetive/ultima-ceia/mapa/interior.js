@@ -958,8 +958,8 @@
     if (window.Decoracao) Decoracao.desenhar(A, ctx, agora);
     animar(A, agora);
     if (window.Investigacao) Investigacao.desenharMundo(A.nivel, ctx, agora);
-    // objetos atrás do personagem
-    for (const c of A.corpos.filter((c) => c !== segurado && corpoAtras(c)).sort((a, b) => a.y - b.y)) desenharCorpo(c);
+    // todos os objetos com física antes dos personagens (os que ficam na frente de alguém são redesenhados depois)
+    for (const c of A.corpos.filter((c) => c !== segurado).sort((a, b) => a.y - b.y)) desenharCorpo(c);
     iluminar(A, agora, vistaX, vistaY, vw, vh);
 
     // nome do cômodo
@@ -968,17 +968,53 @@
     enviarFisica(agora);
   }
   // por cima do personagem: objetos à frente, objeto segurado, rótulo do andar e escurecimento das transições
-  // a cadeira em que o boneco está sentado: atrás dele, menos quando ele senta de costas (aí o encosto fica na frente)
-  function corpoAtras(c) {
-    if (seated && Math.hypot(c.x - x, c.y - y) < 40) return true;
-    return c.y <= y;
+  // todos os bonecos deste andar (você e os outros), com o retângulo que cada um ocupa na tela
+  function jogadoresNoAndar() {
+    const s = Number((window.size && size.value) || 88);
+    const ret = (px, py) => [px - s * 0.36, py - s * 0.95 - 44, s * 0.72, s * 0.95 + 50]; // 44 a mais em cima: pulo
+    const lista = [{ x, y, seated, dir, eu: true, r: ret(x, y) }];
+    if (window.MapaOnline && MapaOnline.ids) for (const id of MapaOnline.ids()) {
+      const o = MapaOnline.jogador(id);
+      if (!o || !o.inside || (o.andar ?? 0) !== andar || performance.now() - (o.visto || 0) > 15000) continue;
+      lista.push({ x: o.x, y: o.y, seated: !!o.seated, dir: o.dir || 0, r: ret(o.x, o.y) });
+    }
+    return lista;
   }
+  // no jardim, o mapa.js já põe as estátuas, postes e plantas na frente do SEU boneco; aqui o mesmo vale para os outros jogadores
+  function frenteDoJardim() {
+    if (typeof sceneObjects === 'undefined' || !window.MapaOnline || !MapaOnline.ids) return;
+    const s = Number((window.size && size.value) || 88);
+    const outros = [];
+    for (const id of MapaOnline.ids()) {
+      const o = MapaOnline.jogador(id);
+      if (!o || o.inside || o.garage || performance.now() - (o.visto || 0) > 15000) continue;
+      outros.push({ y: o.y, r: [o.x - s * 0.36, o.y - s * 0.95 - 44, s * 0.72, s * 0.95 + 50] });
+    }
+    if (!outros.length) return;
+    for (const o of sceneObjects) {
+      if ([647, 725, 80, 1092, 505, 976].includes(o.x) || !o.image.complete || !o.image.naturalWidth) continue;
+      const prof = o.x === 1135 || o.x === 1280 ? 650 : o.base, rc = [o.x, o.y, o.image.width, o.image.height];
+      const atras = outros.filter((p) => p.y < prof && sobrepoeRet(rc, p.r));
+      if (!atras.length) continue;
+      ctx.save(); ctx.beginPath(); for (const p of atras) ctx.rect(...p.r); ctx.clip(); ctx.drawImage(o.image, o.x, o.y); ctx.restore();
+    }
+  }
+  const sobrepoeRet = (a, b) => a[0] < b[0] + b[2] && a[0] + a[2] > b[0] && a[1] < b[1] + b[3] && a[1] + a[3] > b[1];
   function desenharFrente() {
     const A = cache[andar]; if (!A) return;
-    if (window.Decoracao) Decoracao.desenharNaFrente(A, ctx); // móveis que ficam na frente do boneco (ex.: a mesa)
-    for (const c of A.corpos.filter((c) => c !== segurado && !corpoAtras(c)).sort((a, b) => a.y - b.y)) desenharCorpo(c);
+    const js = jogadoresNoAndar();
+    const agora = performance.now(), luz = () => iluminar(A, agora, vistaX, vistaY, cv.width, cv.height); // o que é redesenhado recebe a mesma luz
+    if (window.Decoracao) Decoracao.desenharNaFrente(A, ctx, js, luz); // móveis na frente de quem está atrás deles (ex.: a mesa)
+    // objetos com física que ficam na frente de algum boneco: redesenhados só por cima dele
+    for (const c of A.corpos.filter((c) => c !== segurado).sort((a, b) => a.y - b.y)) {
+      const t = TIPOS[c.tipo], rc = [c.x - t.w * K / 2, c.y + c.h / 2 - t.h * K - c.z, t.w * K, t.h * K];
+      // a cadeira em que alguém está sentado fica atrás dele (de costas, só o encosto vem para a frente, logo abaixo)
+      const atras = js.filter((p) => p.y < c.y && !(p.seated && Math.hypot(c.x - p.x, c.y - p.y) < 40) && sobrepoeRet(rc, p.r));
+      if (!atras.length) continue;
+      ctx.save(); ctx.beginPath(); for (const p of atras) ctx.rect(...p.r); ctx.clip(); ctx.beginPath(); ctx.rect(...rc); ctx.clip(); desenharCorpo(c); luz(); ctx.restore();
+    }
     // sentado de costas (cadeira do lado de cá da mesa): o encosto aparece na frente do corpo
-    if (seated && dir === 3) { const c = A.corpos.find((o) => o.tipo === 'cadeiraB' && Math.hypot(o.x - x, o.y - y) < 40); if (c) desenharCorpo(c, 6); }
+    for (const p of js) if (p.seated && p.dir === 3) { const c = A.corpos.find((o) => o.tipo === 'cadeiraB' && Math.hypot(o.x - p.x, o.y - p.y) < 40); if (c) { ctx.save(); const t = TIPOS[c.tipo]; ctx.beginPath(); ctx.rect(c.x - t.w * K / 2, c.y + c.h / 2 - (t.h - 6) * K, t.w * K, (t.h - 6) * K); ctx.clip(); desenharCorpo(c, 6); luz(); ctx.restore(); } }
     if (segurado) desenharCorpo(segurado);
     ctx.save();
     ctx.font = 'bold 15px Georgia'; ctx.textAlign = 'center';
@@ -1040,7 +1076,7 @@
   const esperarOnline = setInterval(() => {
     if (!window.MapaOnline || MapaOnline.__interior) return;
     const orig = MapaOnline.desenhar;
-    MapaOnline.desenhar = function (dt) { orig.call(this, dt); if (inside) desenharFrente(); };
+    MapaOnline.desenhar = function (dt) { orig.call(this, dt); if (inside) desenharFrente(); else frenteDoJardim(); };
     MapaOnline.__interior = true; clearInterval(esperarOnline);
   }, 50);
 

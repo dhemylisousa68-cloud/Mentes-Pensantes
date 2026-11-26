@@ -261,18 +261,25 @@
     return null;
   }
   // atrás do boneco: o que toca o chão acima dos pés dele (antes de desenhar os personagens)
+  // 1º: todos os móveis, antes dos personagens
   function desenhar(A, g) {
     if (!A.decor) return;
     g.imageSmoothingEnabled = false;
-    const pe = y / K;
-    for (const d of A.decor) if (d.prof <= pe) g.drawImage(d.can, d.x0 * K, d.y0 * K, d.w * K, d.h * K);
+    for (const d of A.decor) g.drawImage(d.can, d.x0 * K, d.y0 * K, d.w * K, d.h * K);
   }
-  // na frente do boneco: o que toca o chão abaixo dos pés (ex.: a mesa quando ele senta atrás dela)
-  function desenharNaFrente(A, g) {
-    if (!A.decor) return;
+  // 2º, depois dos personagens: cada móvel que fica NA FRENTE de algum boneco (o boneco está atrás dele)
+  // é redesenhado só por cima desse boneco. Vale para você e para os outros jogadores.
+  function desenharNaFrente(A, g, jogadores, depois) {
+    if (!A.decor || !jogadores || !jogadores.length) return;
     g.imageSmoothingEnabled = false;
-    const pe = y / K;
-    for (const d of A.decor) if (d.prof > pe) g.drawImage(d.can, d.x0 * K, d.y0 * K, d.w * K, d.h * K);
+    for (const d of A.decor) {
+      if (d.camada === 0) continue;
+      const X = d.x0 * K, Y = d.y0 * K, W = d.w * K, H = d.h * K, prof = d.prof * K;
+      const atras = jogadores.filter((p) => p.y < prof && p.r[0] < X + W && p.r[0] + p.r[2] > X && p.r[1] < Y + H && p.r[1] + p.r[3] > Y);
+      if (!atras.length) continue;
+      g.save(); g.beginPath(); for (const p of atras) g.rect(...p.r); g.clip(); g.beginPath(); g.rect(X, Y, W, H); g.clip(); // só onde o móvel está
+      g.drawImage(d.can, X, Y, W, H); if (depois) depois(); g.restore(); // depois: a mesma luz do ambiente por cima
+    }
   }
 
   // ---------- editor ----------
