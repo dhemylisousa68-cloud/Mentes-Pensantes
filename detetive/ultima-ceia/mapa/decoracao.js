@@ -118,6 +118,7 @@
   // ---------- itens em imagem (pasta itens/): alimentos etc., com subcategorias ----------
   // Ficam por cima dos móveis (camada 2), sem colisão: dá para pôr em cima das mesas e bancadas.
   const imagens = new Map(); // id → { img, ok, esperando }
+  const ocultos = new Set(); // "andar:índice" dos alimentos que estão na mão de alguém ou foram comidos
   function carregarImagem(it) {
     let r = imagens.get(it.id);
     if (r) return r;
@@ -229,7 +230,9 @@
         const c = Interior.D(A, tipo, Math.round(p.x - t.w / 2), Math.round(p.y - t.h / 2), it.v);
         c.id = `${n}:d${idx}`; c.ref = ref; return;
       }
-      const s = girada(it, p.r || 0); if (!s) return; // imagem ainda carregando (redesenha ao chegar)
+      if (ocultos.has(`${n}:${idx}`)) return; // alimento na mão de alguém ou já comido
+      let s = girada(it, p.r || 0); if (!s) return; // imagem ainda carregando (redesenha ao chegar)
+      if (it.img && p.s) s = { ...s, w: s.w * p.s, h: s.h * p.s }; // tamanho escolhido (Shift+scroll)
       poe(A, s, Math.round(p.x - s.w / 2), Math.round(p.y - s.h / 2), it.camada ?? 1, ref);
     });
     A.decor.sort((a, b2) => a.camada - b2.camada || (a.y0 + a.h) - (b2.y0 + b2.h));
@@ -255,7 +258,7 @@
   }
 
   // ---------- editor ----------
-  let modo = false, aberto = false, sel = 0, rot = 0, mouse = null, cat = 'Mesas', sub = null;
+  let modo = false, aberto = false, sel = 0, rot = 0, escala = 1, mouse = null, cat = 'Mesas', sub = null;
   let hotbar = Array(9).fill(null);
   try { const h = JSON.parse(localStorage.getItem('uc_hotbar') || 'null'); if (Array.isArray(h)) hotbar = h.slice(0, 9).concat(Array(9).fill(null)).slice(0, 9); } catch (e) { /* ignora */ }
   const desfazer = [];
@@ -422,7 +425,7 @@
       rot = mod && mod.r ? mod.r : 0;
     } else {
       const p = ad.itens[ref.item], it = p && CAT.get(p.t); if (!it) return;
-      movendo = { ref, tipo: 'item', it }; rot = p.r || 0;
+      movendo = { ref, tipo: 'item', it }; rot = p.r || 0; escala = p.s || 1;
     }
     aplicar(A); mostrarMenu(ev);
   }
@@ -437,7 +440,7 @@
     desfazer.push(JSON.stringify(dados)); if (desfazer.length > 60) desfazer.shift();
     if (ref.pista) dados.pistas[ref.pista] = { andar: n, x: Math.round(m.wx), y: Math.round(m.wy) };
     else if (ref.orig) { ad.orig = ad.orig || {}; ad.orig[ref.orig] = { x: m.nx, y: m.ny, r: rot }; }
-    else { const p = ad.itens[ref.item]; if (p) Object.assign(p, { x: m.nx, y: m.ny, r: rot }); }
+    else { const p = ad.itens[ref.item]; if (p) { Object.assign(p, { x: m.nx, y: m.ny, r: rot }); if (movendo.it && movendo.it.img) { if (escala !== 1) p.s = escala; else delete p.s; } } }
     salvar(); fimMovendo();
   }
   function excluir() {
@@ -476,7 +479,12 @@
   }
   cv.addEventListener('mousemove', (e) => { if (modo) mouse = posMouse(e); });
   cv.addEventListener('mouseleave', () => { mouse = null; });
-  cv.addEventListener('wheel', (e) => { if (!modo || aberto) return; e.preventDefault(); rot = (rot + (e.deltaY > 0 ? 1 : 3)) % 4; }, { passive: false });
+  cv.addEventListener('wheel', (e) => {
+    if (!modo || aberto) return; e.preventDefault();
+    const d = e.deltaY || e.deltaX; // com Shift, alguns navegadores mandam a rolagem na horizontal
+    if (e.shiftKey) { escala = Math.max(0.4, Math.min(2.5, Math.round((escala + (d > 0 ? -0.1 : 0.1)) * 10) / 10)); msg.textContent = 'Tamanho: ' + Math.round(escala * 100) + '%'; return; }
+    rot = (rot + (d > 0 ? 1 : 3)) % 4;
+  }, { passive: false });
   cv.addEventListener('contextmenu', (e) => { if (modo) e.preventDefault(); });
   cv.addEventListener('mousedown', (e) => {
     if (!modo || aberto || !inside) return;
@@ -487,7 +495,7 @@
     const id = hotbar[sel], it = id && item(id); if (!it) { msg.textContent = 'Escolha um item na barra (P abre o inventário) ou clique com o botão direito num móvel.'; return; }
     desfazer.push(JSON.stringify(dados)); if (desfazer.length > 60) desfazer.shift();
     if (it.pista) { dados.pistas[it.pista] = { andar: n, x: Math.round(m.wx), y: Math.round(m.wy) }; salvar(); return; }
-    andarDados(n).itens.push({ t: it.id, x: m.nx, y: m.ny, r: rot });
+    andarDados(n).itens.push({ t: it.id, x: m.nx, y: m.ny, r: rot, ...(it.img && escala !== 1 ? { s: escala } : {}) });
     salvar(); aplicar(Interior.andarDe(n));
   });
   const restaurar = document.createElement('button'); restaurar.textContent = 'Restaurar móveis originais';
@@ -555,6 +563,7 @@
       else if (mao.corpoTipo) { can = Interior.sprite(mao.corpoTipo.tipo, mao.corpoTipo.v); const t = Interior.TIPOS[mao.corpoTipo.tipo]; w = t.w; h = t.h; fixos = [[0, h - t.fh, w, t.fh]]; }
       else if (mao.item.corpo) { const s = spriteCorpo(mao.item, rot); can = s.can; w = s.t.w; h = s.t.h; fixos = [[0, h - s.t.fh, w, s.t.fh]]; }
       else { const s = girada(mao.item, rot); if (!s) { g.restore(); return; } can = s.can; w = s.w; h = s.h; fixos = s.fixos; }
+      if (mao.item && mao.item.img) { w *= escala; h *= escala; }
       const x0 = Math.round(mouse.nx - w / 2), y0 = Math.round(mouse.ny - h / 2);
       const ok = parede || cabe(A, fixos, x0, y0);
       g.globalAlpha = .62;
@@ -566,13 +575,16 @@
     // dica perto do cursor
     g.save(); g.font = '12px system-ui'; g.textAlign = 'left';
     const t = movendo ? 'Clique: soltar aqui · scroll/R gira · Delete exclui · Esc cancela'
-      : mao ? `${mao.nome} · clique coloca · scroll/R gira · botão direito pega um móvel do mapa`
+      : mao ? `${mao.nome} · clique coloca · ${mao.img ? 'Shift+scroll: tamanho (' + Math.round(escala * 100) + '%)' : 'scroll/R gira'} · botão direito pega um móvel do mapa`
         : 'Botão direito: pegar um móvel do mapa · P abre o inventário';
     const w2 = g.measureText(t).width + 12; g.fillStyle = 'rgba(20,14,10,.8)'; g.fillRect(mouse.wx + 16, mouse.wy + 16, w2, 20);
     g.fillStyle = '#f0e2c0'; g.fillText(t, mouse.wx + 22, mouse.wy + 30); g.restore();
   }
 
   window.Decoracao = {
+    // alimentos pegos/comidos somem do lugar (comer.js); "n:idx" = andar e posição na lista de itens
+    ocultar(n, idx, sim) { const k = `${n}:${idx}`; if (sim) ocultos.add(k); else ocultos.delete(k); if (Interior.construidos().includes(+n)) aplicar(Interior.andarDe(+n)); },
+    itemDe(n, idx) { const p = ((dados.andares[n] || {}).itens || [])[idx]; return p ? { it: CAT.get(p.t), p } : null; },
     vazio: (n) => !!(dados.andares[n] && dados.andares[n].vazio),
     pistas: () => dados.pistas,
     aplicar, desenhar, desenharFrente, CATALOGO: C,

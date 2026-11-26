@@ -980,6 +980,7 @@
     ctx.fillStyle = '#f0e2c0'; ctx.fillText(rot, mx, vistaY + 31);
     if (window.Investigacao) Investigacao.desenharFrente(andar, ctx, vistaX, vistaY, cv.width, cv.height, performance.now());
     if (window.Decoracao) Decoracao.desenharFrente(A, ctx, vistaX, vistaY);
+    if (window.Comida) Comida.desenhar(ctx, performance.now());
     if (escuro > 0) { ctx.fillStyle = `rgba(0,0,0,${escuro})`; ctx.fillRect(vistaX, vistaY, cv.width, cv.height); escuro = Math.max(0, escuro - .05); }
     ctx.restore();
   }

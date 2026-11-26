@@ -60,6 +60,7 @@
         .on('broadcast', { event: 'portao' }, ({ payload: p }) => receberPortao(p))
         .on('broadcast', { event: 'caixa' }, ({ payload: p }) => receberCaixa(p))
         .on('broadcast', { event: 'fis' }, ({ payload: p }) => { if (p && p.id !== meuId) dispatchEvent(new CustomEvent('mapa:fis', { detail: p })); })
+        .on('broadcast', { event: 'comida' }, ({ payload: p }) => { if (p && p.id !== meuId) dispatchEvent(new CustomEvent('mapa:comida', { detail: p })); })
         // alguém chegou: conta para ele como está o mundo (portão e caixa)
         .on('presence', { event: 'join' }, ({ key }) => { if (key !== meuId) setTimeout(enviarMundo, 300 + Math.random() * 400); })
         .subscribe(async (s) => {
